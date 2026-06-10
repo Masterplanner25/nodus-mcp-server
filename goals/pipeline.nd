@@ -1,0 +1,20 @@
+// Pipeline goal — input: items (list), label (string)
+// Validates input, then produces a report. Steps run in dependency order;
+// validate is a prerequisite for both report branches.
+
+goal pipeline {
+    step validate {
+        let count = len(items)
+        checkpoint "validated"
+        return count
+    }
+
+    step report after validate {
+        return {
+            "label": label,
+            "item_count": validate,
+            "has_items": validate > 0i,
+            "status": "complete"
+        }
+    }
+}

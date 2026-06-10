@@ -1,0 +1,14 @@
+{
+  "mcpServers": {
+    "nodus": {
+      "command": "python",
+      "args": [
+        "C:/dev/nodus-mcp-server/server.py",
+        "--stdio"
+      ],
+      "env": {
+        "PYTHONPATH": "C:/dev/Coding Language/src"
+      }
+    }
+  }
+}

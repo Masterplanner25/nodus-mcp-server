@@ -1,0 +1,36 @@
+[build-system]
+requires = ["setuptools>=61.0", "wheel"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "nodus-mcp-server"
+version = "0.1.0"
+description = "MCP server powered by the Nodus orchestration runtime"
+authors = [{ name = "Shawn Knight", email = "shawnknight@the-master-plan.com" }]
+license = { file = "LICENSE" }
+readme = "README.md"
+requires-python = ">=3.10"
+keywords = ["mcp", "nodus", "orchestration", "agents", "llm", "claude"]
+classifiers = [
+  "Development Status :: 4 - Beta",
+  "Intended Audience :: Developers",
+  "License :: OSI Approved :: MIT License",
+  "Programming Language :: Python :: 3",
+  "Topic :: Software Development :: Libraries :: Application Frameworks",
+]
+dependencies = [
+  "nodus-lang>=4.0.2,<5.0.0",
+  "nodus-mcp>=0.1.0",
+]
+
+[project.scripts]
+nodus-mcp-server = "server:main"
+
+[project.urls]
+Homepage = "https://github.com/Masterplanner25/nodus-mcp-server"
+Repository = "https://github.com/Masterplanner25/nodus-mcp-server"
+Issues = "https://github.com/Masterplanner25/nodus-mcp-server/issues"
+
+[tool.setuptools.packages.find]
+where = ["."]
+include = ["*"]

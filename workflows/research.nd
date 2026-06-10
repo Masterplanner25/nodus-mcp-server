@@ -1,0 +1,21 @@
+// Research workflow — input: topic (string)
+// Demonstrates checkpoint/resume: the plan step checkpoints its output so
+// the workflow can be resumed from "planned" without re-running planning.
+
+workflow research {
+    step plan {
+        let query = topic
+        checkpoint "planned"
+        return {"query": query, "strategy": "step-by-step"}
+    }
+
+    step execute after plan {
+        checkpoint "executed"
+        return {
+            "topic": topic,
+            "query": plan["query"],
+            "strategy": plan["strategy"],
+            "status": "complete"
+        }
+    }
+}

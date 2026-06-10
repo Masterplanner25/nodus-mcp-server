@@ -1,0 +1,17 @@
+// Summarize goal — input: text (string)
+// Measures character count then classifies the text by size.
+
+goal summarize {
+    step measure {
+        let char_count = len(text)
+        checkpoint "measured"
+        return char_count
+    }
+
+    step classify after measure {
+        let size = "short"
+        if (measure > 500i) { size = "medium" }
+        if (measure > 2000i) { size = "long" }
+        return {"chars": measure, "size": size, "empty": measure == 0i}
+    }
+}
