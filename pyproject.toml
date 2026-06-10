@@ -24,7 +24,7 @@ dependencies = [
 ]
 
 [project.scripts]
-nodus-mcp-server = "server:main"
+nodus-mcp-server = "nodus_mcp_server.server:main"
 
 [project.urls]
 Homepage = "https://github.com/Masterplanner25/nodus-mcp-server"
@@ -33,4 +33,6 @@ Issues = "https://github.com/Masterplanner25/nodus-mcp-server/issues"
 
 [tool.setuptools.packages.find]
 where = ["."]
-include = ["*"]
+
+[tool.setuptools.package-data]
+nodus_mcp_server = ["goals/*.nd", "workflows/*.nd"]

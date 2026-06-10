@@ -8,13 +8,13 @@ import sys
 from nodus.runtime.embedding import NodusRuntime
 from nodus_mcp import McpServer, StdioServerTransport, HttpServerTransport
 
-from memory_store import MemoryStore
-import runner
+from .memory_store import MemoryStore
+from . import runner
 
-# ── Paths ────────────────────────────────────────────────────────────────────
+# ── Data directory ────────────────────────────────────────────────────────────
+# Stored in the user's home directory so it survives upgrades and pip reinstalls.
 
-_HERE = os.path.dirname(os.path.abspath(__file__))
-_DATA_DIR = os.path.join(_HERE, "data")
+_DATA_DIR = os.path.join(os.path.expanduser("~"), ".nodus-mcp-server", "data")
 os.makedirs(_DATA_DIR, exist_ok=True)
 
 # ── Runtime ──────────────────────────────────────────────────────────────────

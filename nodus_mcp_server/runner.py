@@ -27,9 +27,8 @@ def _load(directory: str, name: str, kind: str) -> tuple[str, str]:
 def _load_into_vm(code: str, path: str, params: dict, timeout_ms: int) -> tuple[VM, str]:
     """Compile and execute module-level code (goal/workflow definition) into a sandboxed VM.
 
-    host_globals are passed to the ModuleLoader so that reset_program propagates them
-    to the VM — passing them only to the VM constructor is not enough because
-    _execute_module overwrites vm.host_globals via reset_program.
+    host_globals must be passed to ModuleLoader — passing them only to the VM constructor
+    is not enough because _execute_module overwrites vm.host_globals via reset_program.
     """
     vm = VM([], {}, code_locs=[], source_path=path, allowed_paths=[])
     configure_vm_limits(vm, max_steps=MAX_STEPS, timeout_ms=timeout_ms)
