@@ -18,6 +18,11 @@ from . import runner
 _DATA_DIR = os.path.join(os.path.expanduser("~"), ".nodus-mcp-server", "data")
 os.makedirs(_DATA_DIR, exist_ok=True)
 
+# Claude Desktop spawns servers with CWD=system32 on Windows, which is not writable.
+# Any nodus-lang path that resolves .nodus relative to CWD (task_graph, snapshots)
+# will fail with WinError 5. Anchor CWD to the user's home dir at startup.
+os.chdir(os.path.expanduser("~"))
+
 _runtime = NodusRuntime(timeout_ms=None, max_steps=None, allowed_paths=[])
 _store = MemoryStore(os.path.join(_DATA_DIR, "memory.db"))
 

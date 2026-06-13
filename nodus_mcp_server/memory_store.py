@@ -33,7 +33,7 @@ class MemoryStore:
 
     def remember(self, content: str, tags: list[str]) -> dict:
         mem_id = str(uuid.uuid4())[:8]
-        tags_str = ",".join(t.strip() for t in tags if t.strip())
+        tags_str = ",".join(t.strip().lower() for t in tags if t.strip())
         with self._lock, self._conn() as conn:
             conn.execute(
                 "INSERT INTO memories (id, content, tags, created_at) VALUES (?, ?, ?, ?)",
@@ -53,7 +53,7 @@ class MemoryStore:
 
         for row in rows:
             content = row["content"]
-            row_tags = {t for t in row["tags"].split(",") if t}
+            row_tags = {t.lower() for t in row["tags"].split(",") if t}
             if query_lower and query_lower not in content.lower():
                 continue
             if filter_tags and not filter_tags.intersection(row_tags):
