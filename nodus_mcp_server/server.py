@@ -25,7 +25,7 @@ app = Server("nodus-mcp-server")
 
 _TOOLS = [
     types.Tool(
-        name="nodus.remember",
+        name="nodus_remember",
         description=(
             "Store a piece of information in persistent memory. "
             "Supply optional tags to make it easier to recall later."
@@ -44,7 +44,7 @@ _TOOLS = [
         },
     ),
     types.Tool(
-        name="nodus.recall",
+        name="nodus_recall",
         description=(
             "Search persistent memory. Filter by free-text query and/or tags. "
             "Returns up to `limit` matching entries (default 5, max 20)."
@@ -63,7 +63,7 @@ _TOOLS = [
         },
     ),
     types.Tool(
-        name="nodus.forget",
+        name="nodus_forget",
         description="Remove a memory entry by its ID (returned by nodus.remember).",
         inputSchema={
             "type": "object",
@@ -74,7 +74,7 @@ _TOOLS = [
         },
     ),
     types.Tool(
-        name="nodus.run_goal",
+        name="nodus_run_goal",
         description=(
             "Execute a pre-defined Nodus goal by name. "
             "Built-in goals: 'summarize' (params: {text}), 'pipeline' (params: {items, label}). "
@@ -90,7 +90,7 @@ _TOOLS = [
         },
     ),
     types.Tool(
-        name="nodus.run_workflow",
+        name="nodus_run_workflow",
         description=(
             "Execute a pre-defined Nodus workflow by name. "
             "Built-in workflows: 'research' (params: {topic}). "
@@ -106,7 +106,7 @@ _TOOLS = [
         },
     ),
     types.Tool(
-        name="nodus.exec",
+        name="nodus_exec",
         description=(
             "Execute arbitrary Nodus (.nd) code in a sandboxed runtime "
             "(no file I/O, no network, 10s timeout). "
@@ -131,12 +131,12 @@ async def list_tools() -> list[types.Tool]:
 @app.call_tool()
 async def call_tool(name: str, arguments: dict) -> list[types.TextContent]:
     handlers = {
-        "nodus.remember": _remember,
-        "nodus.recall": _recall,
-        "nodus.forget": _forget,
-        "nodus.run_goal": _run_goal,
-        "nodus.run_workflow": _run_workflow,
-        "nodus.exec": _exec,
+        "nodus_remember": _remember,
+        "nodus_recall": _recall,
+        "nodus_forget": _forget,
+        "nodus_run_goal": _run_goal,
+        "nodus_run_workflow": _run_workflow,
+        "nodus_exec": _exec,
     }
     handler = handlers.get(name)
     if handler is None:
