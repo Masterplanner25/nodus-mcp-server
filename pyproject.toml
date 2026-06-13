@@ -19,7 +19,7 @@ classifiers = [
   "Topic :: Software Development :: Libraries :: Application Frameworks",
 ]
 dependencies = [
-  "nodus-lang>=4.0.2,<5.0.0",
+  "nodus-lang>=4.0.4,<5.0.0",
   "nodus-mcp>=0.1.0",
 ]
 
@@ -36,3 +36,6 @@ where = ["."]
 
 [tool.setuptools.package-data]
 nodus_mcp_server = ["goals/*.nd", "workflows/*.nd"]
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]

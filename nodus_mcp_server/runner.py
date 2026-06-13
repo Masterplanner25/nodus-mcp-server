@@ -41,7 +41,10 @@ def _load_into_vm(code: str, path: str, params: dict, timeout_ms: int) -> tuple[
 
 
 def run_goal(runtime: Any, name: str, params: dict) -> dict:
-    code, path = _load(GOALS_DIR, name, "goal")
+    try:
+        code, path = _load(GOALS_DIR, name, "goal")
+    except FileNotFoundError as exc:
+        return {"ok": False, "error": str(exc)}
     try:
         vm, def_stdout = _load_into_vm(code, path, params, timeout_ms=30_000)
     except Exception as exc:
@@ -62,7 +65,10 @@ def run_goal(runtime: Any, name: str, params: dict) -> dict:
 
 
 def run_workflow(runtime: Any, name: str, params: dict) -> dict:
-    code, path = _load(WORKFLOWS_DIR, name, "workflow")
+    try:
+        code, path = _load(WORKFLOWS_DIR, name, "workflow")
+    except FileNotFoundError as exc:
+        return {"ok": False, "error": str(exc)}
     try:
         vm, def_stdout = _load_into_vm(code, path, params, timeout_ms=60_000)
     except Exception as exc:

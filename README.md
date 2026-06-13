@@ -18,23 +18,25 @@ Six tools over a single server process:
 ## Requirements
 
 - Python ≥ 3.10
-- `nodus-lang >= 4.0.2`
+- `nodus-lang >= 4.0.4`
 - `nodus-mcp >= 0.1.0`
 
+## Install
+
 ```
-pip install nodus-lang>=4.0.2 nodus-mcp>=0.1.0
+pip install nodus-lang nodus-mcp nodus-mcp-server
 ```
 
 ## Claude Desktop setup
 
-Add to your `claude_desktop_config.json` (see `claude_desktop_config.json` in this repo for an example):
+Add to your `claude_desktop_config.json`:
 
 ```json
 {
   "mcpServers": {
     "nodus": {
-      "command": "python",
-      "args": ["<path-to>/server.py", "--stdio"]
+      "command": "nodus-mcp-server",
+      "args": ["--stdio"]
     }
   }
 }
@@ -42,13 +44,15 @@ Add to your `claude_desktop_config.json` (see `claude_desktop_config.json` in th
 
 Restart Claude Desktop. The six `nodus.*` tools will appear in the tool list.
 
+Memory persists at `~/.nodus-mcp-server/data/memory.db` and survives upgrades.
+
 ## HTTP mode
 
 For remote or multi-client use:
 
 ```
-python server.py --http --port 8080
-python server.py --http --port 8080 --bearer-token <secret>
+nodus-mcp-server --http --port 8080
+nodus-mcp-server --http --port 8080 --bearer-token <secret>
 ```
 
 ## Built-in goals and workflows
@@ -156,7 +160,7 @@ runner.py          — goal/workflow execution via ModuleLoader + VM
 memory_store.py    — SQLite-backed thread-safe memory store
 goals/             — .nd goal definitions
 workflows/         — .nd workflow definitions
-data/              — SQLite DB (gitignored)
+~/.nodus-mcp-server/data/memory.db  — SQLite DB (persists across upgrades)
 ```
 
 ## License
