@@ -1,35 +1,42 @@
 # nodus-mcp-server
 
-An MCP (Model Context Protocol) server that exposes the [Nodus](https://github.com/Masterplanner25/Nodus) orchestration runtime as tools for Claude Desktop and other MCP-compatible hosts.
+An MCP server that connects [Claude Desktop](https://claude.ai/download) to the [Nodus](https://github.com/Masterplanner25/Nodus) language runtime — giving Claude persistent memory, sandboxed code execution, and checkpoint/resume orchestration workflows, all powered by `.nd` scripts running on the Nodus VM.
 
-## What it does
+## Tools
 
-Six tools over a single server process:
-
-| Tool | Description |
+| Tool | What it does |
 |------|-------------|
-| `nodus.remember` | Store a fact in persistent SQLite memory with optional tags |
-| `nodus.recall` | Search memory by free-text query and/or tags |
-| `nodus.forget` | Delete a memory entry by ID |
-| `nodus.run_goal` | Run a Nodus goal (sandboxed, structured step results) |
-| `nodus.run_workflow` | Run a Nodus workflow (checkpoint/resume capable) |
-| `nodus.exec` | Execute arbitrary `.nd` code (10 s timeout, no file I/O) |
+| `nodus_remember` | Store a fact in persistent memory with optional tags |
+| `nodus_recall` | Search memory by free-text query and/or tags |
+| `nodus_forget` | Delete a memory entry by ID |
+| `nodus_run_goal` | Run a built-in Nodus goal (structured multi-step result) |
+| `nodus_run_workflow` | Run a built-in Nodus workflow (returns a `graph_id` for resuming) |
+| `nodus_resume_workflow` | Resume a workflow from a checkpoint using its `graph_id` |
+| `nodus_exec` | Execute arbitrary Nodus code in a sandbox (no file I/O, no network, no subprocess, 10 s timeout) |
 
 ## Requirements
 
 - Python ≥ 3.10
-- `nodus-lang >= 4.0.4`
-- `nodus-mcp >= 0.1.0`
+- [pipx](https://pipx.pypa.io/) (recommended for Claude Desktop — keeps the server in its own isolated environment)
+- Claude Desktop (the downloadable app, not the browser version)
 
 ## Install
 
 ```
-pip install nodus-lang nodus-mcp nodus-mcp-server
+pipx install nodus-mcp-server
 ```
 
 ## Claude Desktop setup
 
-Add to your `claude_desktop_config.json`:
+### 1. Find your config file
+
+| Setup | Config path |
+|-------|-------------|
+| Standard install | `%APPDATA%\Claude\claude_desktop_config.json` |
+| Windows Store app | `%LOCALAPPDATA%\Packages\Claude_pzs8sxrjxfjjc\LocalCache\Roaming\Claude\claude_desktop_config.json` |
+| macOS | `~/Library/Application Support/Claude/claude_desktop_config.json` |
+
+### 2. Add the server
 
 ```json
 {
@@ -42,96 +49,90 @@ Add to your `claude_desktop_config.json`:
 }
 ```
 
-Restart Claude Desktop. The six `nodus.*` tools will appear in the tool list.
+If `nodus-mcp-server` isn't on your PATH, use the full path to the executable. On Windows with pipx that's typically `C:\Users\<you>\.local\bin\nodus-mcp-server.exe`.
 
-Memory persists at `~/.nodus-mcp-server/data/memory.db` and survives upgrades.
+### 3. Restart Claude Desktop
 
-## HTTP mode
+The seven `nodus_*` tools will appear when you click the tools icon (the `+` button or tool picker) in a new conversation.
 
-For remote or multi-client use:
+## How to use
+
+### Memory
+
+Store anything you want Claude to remember across conversations:
 
 ```
-nodus-mcp-server --http --port 8080
-nodus-mcp-server --http --port 8080 --bearer-token <secret>
+Use nodus_remember to store: "Project deadline is 2026-07-01" with tags ["project", "deadlines"]
 ```
 
-## Built-in goals and workflows
+Retrieve it later:
 
-### Goals
-
-**`summarize`** — `params: {text: string}`
-
-Counts characters and classifies text size (short / medium / long).
-
-```json
-{
-  "name": "summarize",
-  "params": {"text": "Your text here"}
-}
+```
+Use nodus_recall to find memories tagged "deadlines"
 ```
 
-Returns:
-```json
-{
-  "steps": {
-    "measure": 14,
-    "classify": {"chars": 14, "size": "short", "empty": false}
-  }
-}
+Or search by content:
+
+```
+Use nodus_recall to find memories about "deadline"
 ```
 
-**`pipeline`** — `params: {items: list, label: string}`
+Memory is stored in a local SQLite database at `~/.nodus-mcp-server/data/memory.db` and persists across upgrades.
 
-Validates an item list and produces a labelled report.
+### Sandboxed code execution
 
-```json
-{
-  "name": "pipeline",
-  "params": {"items": [1, 2, 3], "label": "batch-1"}
-}
+Run Nodus (`.nd`) code in a fully sandboxed runtime:
+
+```
+Use nodus_exec to run: print("Hello from Nodus!")
 ```
 
-Returns:
-```json
-{
-  "steps": {
-    "validate": 3,
-    "report": {"label": "batch-1", "item_count": 3, "has_items": true, "status": "complete"}
-  }
-}
+The sandbox enforces: no file I/O, no network, no subprocess. Use `print()` to surface results — top-level return values are not captured.
+
+### Goals (structured multi-step tasks)
+
+Goals run a fixed sequence of named steps and return each step's result:
+
+```
+Use nodus_run_goal with name "summarize" and params {"text": "your text here"}
 ```
 
-### Workflows
+Built-in goals:
 
-**`research`** — `params: {topic: string}`
+| Goal | Params | What it does |
+|------|--------|-------------|
+| `summarize` | `{text}` | Counts characters, classifies size (short/medium/long) |
+| `pipeline` | `{items, label}` | Validates a list and produces a labelled report |
 
-Two-step planning + execution workflow with checkpoints at each step.
+### Workflows (checkpoint/resume orchestration)
 
-```json
-{
-  "name": "research",
-  "params": {"topic": "LLM context windows"}
-}
+Workflows are like goals but support checkpoints — they can be paused and resumed from a saved state:
+
+```
+Use nodus_run_workflow with name "research" and params {"topic": "LLM context windows"}
 ```
 
-Returns:
-```json
-{
-  "steps": {
-    "plan": {"query": "LLM context windows", "strategy": "step-by-step"},
-    "execute": {"topic": "LLM context windows", "query": "LLM context windows", "strategy": "step-by-step", "status": "complete"}
-  }
-}
+The response includes a `graph_id`. Use it to resume the workflow later:
+
 ```
+Use nodus_resume_workflow with graph_id "g_abc123" (and optionally a checkpoint label)
+```
+
+Built-in workflows:
+
+| Workflow | Params | What it does |
+|----------|--------|-------------|
+| `research` | `{topic}` | Two-step plan + execute workflow with checkpoints at each step |
 
 ## Adding your own goals and workflows
 
-Drop a `.nd` file into `goals/` or `workflows/`. The file should **only define** the goal or workflow — do not call `run_goal()` or `run_workflow()` at the bottom (the server calls it for you).
+Goals and workflows are `.nd` files (Nodus source) placed in the `goals/` or `workflows/` directory of the installed package. The file should **only define** the goal or workflow — the server calls it for you.
 
 ```nodus
-// goals/my_goal.nd  — input variable injected via params
+// goals/my_goal.nd
 goal my_goal {
     step process {
+        if (input_text == nil) { throw "missing required param: input_text" }
         let result = len(input_text)
         return {"length": result, "has_content": result > 0i}
     }
@@ -143,25 +144,33 @@ Then call it:
 {"name": "my_goal", "params": {"input_text": "hello"}}
 ```
 
-## Sandbox
+Input `params` are injected as top-level variables in the `.nd` execution context. Check `nil` before using them — missing params surface as `nil`, not an error, unless you throw explicitly.
 
-`.nd` scripts run with:
-- No file system access (`allowed_paths=[]`)
-- No network access
-- Goal timeout: 30 s
-- Workflow timeout: 60 s
-- `nodus.exec` timeout: 10 s
+See the [Nodus language guide](https://github.com/Masterplanner25/Nodus/tree/main/docs/guide) for the full `.nd` syntax reference.
+
+## About Nodus
+
+The goals, workflows, and `nodus_exec` sandbox all run on the [Nodus](https://github.com/Masterplanner25/Nodus) VM — a lightweight, embeddable language runtime designed for AI-native orchestration. Nodus scripts (`.nd` files) define the step logic; the MCP server wires them to Claude over the Model Context Protocol.
 
 ## Architecture
 
 ```
-server.py          — NodusRuntime, tool registration, MCP transport
+server.py          — MCP tool definitions, NodusRuntime setup, request dispatch
 runner.py          — goal/workflow execution via ModuleLoader + VM
 memory_store.py    — SQLite-backed thread-safe memory store
-goals/             — .nd goal definitions
-workflows/         — .nd workflow definitions
+goals/             — .nd goal definitions (bundled + custom)
+workflows/         — .nd workflow definitions (bundled + custom)
 ~/.nodus-mcp-server/data/memory.db  — SQLite DB (persists across upgrades)
 ```
+
+## Upgrading
+
+```
+Stop-Process -Name "nodus-mcp-server" -Force   # Windows — close before reinstalling
+pipx install nodus-mcp-server --force
+```
+
+Then restart Claude Desktop.
 
 ## License
 
