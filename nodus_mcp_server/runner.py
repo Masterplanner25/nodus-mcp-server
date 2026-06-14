@@ -95,6 +95,5 @@ def exec_code(runtime: Any, code: str) -> dict:
         return {"ok": False, "error": err.get("message", "execution failed")}
     return {
         "ok": True,
-        "result": result.get("result"),
         "stdout": result.get("stdout", "").strip(),
     }

@@ -115,7 +115,8 @@ _TOOLS = [
         description=(
             "Execute arbitrary Nodus (.nd) code in a sandboxed runtime "
             "(no file I/O, no network, 10s timeout). "
-            "Returns the final expression value and any stdout."
+            "Output is captured via print() — use print(value) to surface results. "
+            "Top-level return is not supported; use print() instead."
         ),
         inputSchema={
             "type": "object",
