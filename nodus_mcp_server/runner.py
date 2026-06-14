@@ -7,11 +7,7 @@ from typing import Any
 from nodus.vm.vm import VM
 from nodus.runtime.module_loader import ModuleLoader
 from nodus.tooling.sandbox import capture_output, configure_vm_limits
-from nodus.tooling.runner import (
-    _resolve_goal_from_vm,
-    _resolve_workflow_from_vm,
-    resume_workflow as _nodus_resume_workflow,
-)
+from nodus.tooling.runner import _resolve_goal_from_vm, _resolve_workflow_from_vm
 from nodus.support.config import MAX_STEPS, MAX_STDOUT_CHARS
 
 _HERE = os.path.dirname(os.path.abspath(__file__))
@@ -117,20 +113,50 @@ def run_workflow(runtime: Any, name: str, params: dict) -> dict:
 
 
 def resume_workflow_tool(graph_id: str, checkpoint: str | None) -> dict:
+    from nodus.orchestration.task_graph import load_graph_state
+
+    # Find the workflow name from persisted state so we can reload the definition.
+    state = load_graph_state(graph_id)
+    if state is None:
+        return {"ok": False, "error": f"no saved state found for graph_id '{graph_id}'"}
+    metadata = state.get("metadata") or {}
+    workflow_name = metadata.get("workflow_name")
+    if not workflow_name:
+        return {"ok": False, "error": f"cannot determine workflow name from state for '{graph_id}'"}
+
+    # Load the workflow .nd file into a fresh VM so _rebuild_workflow_graph
+    # can reconstruct the graph from the persisted state.
     try:
-        result, _ = _nodus_resume_workflow(graph_id, checkpoint, timeout_ms=60_000)
+        code, path = _load(WORKFLOWS_DIR, workflow_name, "workflow")
+    except FileNotFoundError as exc:
+        return {"ok": False, "error": str(exc)}
+    try:
+        vm, def_stdout = _load_into_vm(code, path, {}, timeout_ms=60_000)
     except Exception as exc:
         return {"ok": False, "error": str(exc)}
-    if not result.get("ok"):
-        err = result.get("error") or {}
-        msg = err.get("message", "resume failed") if isinstance(err, dict) else str(err)
-        return {"ok": False, "error": msg}
-    r = result.get("result") or {}
-    r_data = r if isinstance(r, dict) else {}
-    steps = r_data.get("steps", {})
-    out: dict = {"ok": True, "graph_id": graph_id, "steps": steps}
+
+    try:
+        with capture_output(max_stdout_chars=MAX_STDOUT_CHARS) as (run_out, _):
+            wf_result = vm.builtin_resume_workflow(graph_id, checkpoint)
+    except Exception as exc:
+        return {"ok": False, "error": str(exc)}
+
+    combined_stdout = (def_stdout + run_out.getvalue()).strip()
+    wf_data = wf_result if isinstance(wf_result, dict) else {}
+    if _is_failed_result(wf_data):
+        failed = wf_data.get("failed", [])
+        err_msg = f"workflow step(s) failed on resume: {', '.join(str(f) for f in failed)}" if failed else "workflow resume failed"
+        out: dict = {"ok": False, "error": err_msg, "graph_id": graph_id}
+        if combined_stdout:
+            out["stdout"] = combined_stdout
+        return out
+    steps = wf_data.get("steps", {})
+    resumed_graph_id = wf_data.get("graph_id", graph_id)
+    out = {"ok": True, "graph_id": resumed_graph_id, "steps": steps}
     if checkpoint:
         out["resumed_from"] = checkpoint
+    if combined_stdout:
+        out["stdout"] = combined_stdout
     return out
 
 
