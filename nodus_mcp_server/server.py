@@ -99,7 +99,7 @@ _TOOLS = [
         description=(
             "Execute a pre-defined Nodus workflow by name. "
             "Built-in workflows: 'research' (params: {topic}). "
-            "Workflows support checkpoint/resume for durable multi-step execution."
+            "Returns graph_id which can be passed to nodus_resume_workflow to resume from a checkpoint."
         ),
         inputSchema={
             "type": "object",
@@ -111,10 +111,26 @@ _TOOLS = [
         },
     ),
     types.Tool(
+        name="nodus_resume_workflow",
+        description=(
+            "Resume a Nodus workflow from a checkpoint. "
+            "Pass the graph_id returned by nodus_run_workflow and optionally a checkpoint label. "
+            "Skips already-completed steps and re-runs from the checkpoint."
+        ),
+        inputSchema={
+            "type": "object",
+            "properties": {
+                "graph_id": {"type": "string", "description": "The graph_id returned by nodus_run_workflow."},
+                "checkpoint": {"type": "string", "description": "Checkpoint label to resume from (optional)."},
+            },
+            "required": ["graph_id"],
+        },
+    ),
+    types.Tool(
         name="nodus_exec",
         description=(
             "Execute arbitrary Nodus (.nd) code in a sandboxed runtime "
-            "(no file I/O, no network, 10s timeout). "
+            "(no file I/O, 10s timeout). "
             "Output is captured via print() — use print(value) to surface results. "
             "Top-level return is not supported; use print() instead."
         ),
@@ -142,6 +158,7 @@ async def call_tool(name: str, arguments: dict) -> list[types.TextContent]:
         "nodus_forget": _forget,
         "nodus_run_goal": _run_goal,
         "nodus_run_workflow": _run_workflow,
+        "nodus_resume_workflow": _resume_workflow,
         "nodus_exec": _exec,
     }
     handler = handlers.get(name)
@@ -190,6 +207,16 @@ def _run_workflow(args: dict) -> dict:
     if not name:
         return {"ok": False, "error": "name is required"}
     return runner.run_workflow(_runtime, name, params)
+
+
+def _resume_workflow(args: dict) -> dict:
+    graph_id = str(args.get("graph_id") or "")
+    checkpoint = args.get("checkpoint") or None
+    if checkpoint is not None:
+        checkpoint = str(checkpoint)
+    if not graph_id:
+        return {"ok": False, "error": "graph_id is required"}
+    return runner.resume_workflow_tool(graph_id, checkpoint)
 
 
 def _exec(args: dict) -> dict:

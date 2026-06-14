@@ -51,10 +51,11 @@ class MemoryStore:
         query_lower = query.lower()
         filter_tags = {t.strip().lower() for t in tags if t.strip()}
 
+        query_terms = query_lower.split() if query_lower else []
         for row in rows:
             content = row["content"]
             row_tags = {t.lower() for t in row["tags"].split(",") if t}
-            if query_lower and query_lower not in content.lower():
+            if query_terms and not all(term in content.lower() for term in query_terms):
                 continue
             if filter_tags and not filter_tags.intersection(row_tags):
                 continue

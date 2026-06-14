@@ -7,7 +7,11 @@ from typing import Any
 from nodus.vm.vm import VM
 from nodus.runtime.module_loader import ModuleLoader
 from nodus.tooling.sandbox import capture_output, configure_vm_limits
-from nodus.tooling.runner import _resolve_goal_from_vm, _resolve_workflow_from_vm
+from nodus.tooling.runner import (
+    _resolve_goal_from_vm,
+    _resolve_workflow_from_vm,
+    resume_workflow as _nodus_resume_workflow,
+)
 from nodus.support.config import MAX_STEPS, MAX_STDOUT_CHARS
 
 _HERE = os.path.dirname(os.path.abspath(__file__))
@@ -40,6 +44,10 @@ def _load_into_vm(code: str, path: str, params: dict, timeout_ms: int) -> tuple[
     return vm, stdout.getvalue()
 
 
+def _is_failed_result(data: dict) -> bool:
+    return bool(data.get("failed")) or data.get("ok") is False
+
+
 def run_goal(runtime: Any, name: str, params: dict) -> dict:
     try:
         code, path = _load(GOALS_DIR, name, "goal")
@@ -57,8 +65,18 @@ def run_goal(runtime: Any, name: str, params: dict) -> dict:
         return {"ok": False, "error": str(exc)}
     combined_stdout = (def_stdout + run_out.getvalue()).strip()
     goal_data = goal_result if isinstance(goal_result, dict) else {}
+    if _is_failed_result(goal_data):
+        failed = goal_data.get("failed", [])
+        err_msg = f"goal step(s) failed: {', '.join(str(f) for f in failed)}" if failed else "goal execution failed"
+        out: dict = {"ok": False, "error": err_msg, "goal": name}
+        if combined_stdout:
+            out["stdout"] = combined_stdout
+        return out
     steps = goal_data.get("steps", {})
-    out: dict = {"ok": True, "goal": name, "steps": steps}
+    graph_id = goal_data.get("graph_id")
+    out = {"ok": True, "goal": name, "steps": steps}
+    if graph_id:
+        out["graph_id"] = graph_id
     if combined_stdout:
         out["stdout"] = combined_stdout
     return out
@@ -81,10 +99,38 @@ def run_workflow(runtime: Any, name: str, params: dict) -> dict:
         return {"ok": False, "error": str(exc)}
     combined_stdout = (def_stdout + run_out.getvalue()).strip()
     wf_data = wf_result if isinstance(wf_result, dict) else {}
+    if _is_failed_result(wf_data):
+        failed = wf_data.get("failed", [])
+        err_msg = f"workflow step(s) failed: {', '.join(str(f) for f in failed)}" if failed else "workflow execution failed"
+        out: dict = {"ok": False, "error": err_msg, "workflow": name}
+        if combined_stdout:
+            out["stdout"] = combined_stdout
+        return out
     steps = wf_data.get("steps", {})
-    out: dict = {"ok": True, "workflow": name, "steps": steps}
+    graph_id = wf_data.get("graph_id")
+    out = {"ok": True, "workflow": name, "steps": steps}
+    if graph_id:
+        out["graph_id"] = graph_id
     if combined_stdout:
         out["stdout"] = combined_stdout
+    return out
+
+
+def resume_workflow_tool(graph_id: str, checkpoint: str | None) -> dict:
+    try:
+        result, _ = _nodus_resume_workflow(graph_id, checkpoint, timeout_ms=60_000)
+    except Exception as exc:
+        return {"ok": False, "error": str(exc)}
+    if not result.get("ok"):
+        err = result.get("error") or {}
+        msg = err.get("message", "resume failed") if isinstance(err, dict) else str(err)
+        return {"ok": False, "error": msg}
+    r = result.get("result") or {}
+    r_data = r if isinstance(r, dict) else {}
+    steps = r_data.get("steps", {})
+    out: dict = {"ok": True, "graph_id": graph_id, "steps": steps}
+    if checkpoint:
+        out["resumed_from"] = checkpoint
     return out
 
 

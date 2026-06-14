@@ -3,6 +3,7 @@
 
 goal summarize {
     step measure {
+        if (text == nil) { throw "missing required param: text" }
         let char_count = len(text)
         checkpoint "measured"
         return char_count
