@@ -24,6 +24,13 @@ os.makedirs(_DATA_DIR, exist_ok=True)
 os.chdir(os.path.expanduser("~"))
 
 _runtime = NodusRuntime(timeout_ms=None, max_steps=None, allowed_paths=[])
+_exec_runtime = NodusRuntime(
+    timeout_ms=None,
+    max_steps=None,
+    allowed_paths=[],
+    allow_network=False,
+    allow_subprocess=False,
+)
 _store = MemoryStore(os.path.join(_DATA_DIR, "memory.db"))
 
 app = Server("nodus-mcp-server")
@@ -130,7 +137,7 @@ _TOOLS = [
         name="nodus_exec",
         description=(
             "Execute arbitrary Nodus (.nd) code in a sandboxed runtime "
-            "(no file I/O, 10s timeout). "
+            "(no file I/O, no network, no subprocess, 10s timeout). "
             "Output is captured via print() — use print(value) to surface results. "
             "Top-level return is not supported; use print() instead."
         ),
@@ -223,7 +230,7 @@ def _exec(args: dict) -> dict:
     code = str(args.get("code") or "")
     if not code.strip():
         return {"ok": False, "error": "code is required"}
-    return runner.exec_code(_runtime, code)
+    return runner.exec_code(_exec_runtime, code)
 
 
 # ── Entry point ───────────────────────────────────────────────────────────────
