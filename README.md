@@ -1,6 +1,8 @@
 # nodus-mcp-server
 
-An MCP server that connects [Claude Desktop](https://claude.ai/download) to the [Nodus](https://github.com/Masterplanner25/Nodus) language runtime — giving Claude persistent memory, sandboxed code execution, and checkpoint/resume orchestration workflows, all powered by `.nd` scripts running on the Nodus VM.
+An MCP server that connects AI assistants to the [Nodus](https://github.com/Masterplanner25/Nodus) language runtime — giving them persistent memory, sandboxed code execution, and checkpoint/resume orchestration workflows, all powered by `.nd` scripts running on the Nodus VM.
+
+Supports **Claude Desktop** (stdio) and **ChatGPT Desktop** (HTTP/SSE).
 
 ## Tools
 
@@ -17,8 +19,8 @@ An MCP server that connects [Claude Desktop](https://claude.ai/download) to the 
 ## Requirements
 
 - Python ≥ 3.10
-- [pipx](https://pipx.pypa.io/) (recommended for Claude Desktop — keeps the server in its own isolated environment)
-- Claude Desktop (the downloadable app, not the browser version)
+- [pipx](https://pipx.pypa.io/) (recommended — keeps the server in its own isolated environment)
+- Claude Desktop **or** ChatGPT Desktop (the downloadable apps, not browser versions)
 
 ## Install
 
@@ -163,6 +165,39 @@ workflows/         — .nd workflow definitions (bundled + custom)
 ~/.nodus-mcp-server/data/memory.db  — SQLite DB (persists across upgrades)
 ```
 
+## ChatGPT Desktop setup
+
+ChatGPT uses HTTP/SSE transport. Start the server in HTTP mode, then point ChatGPT at the URL.
+
+### 1. Start the HTTP server
+
+```bash
+nodus-mcp-server --http --port 8765
+```
+
+This prints:
+```
+[nodus-mcp-server] HTTP/SSE listening on http://127.0.0.1:8765/sse
+[nodus-mcp-server] Point ChatGPT / your MCP client at: http://127.0.0.1:8765/sse
+```
+
+Keep this terminal open while using ChatGPT.
+
+### 2. Connect in ChatGPT Desktop
+
+1. Click your profile icon → **Settings** → **Apps**
+2. Go to **Advanced Settings** → enable **Developer Mode**
+3. Click **Create App** (or **Connect more**)
+4. Enter a name (e.g. `Nodus`), description, and base URL: `http://127.0.0.1:8765/sse`
+
+### 3. Use in a chat
+
+Open a new chat → click `+` → **More** → **Developer Mode** → enable your Nodus app. The seven `nodus_*` tools are now available.
+
+> **Note:** The HTTP server must be running before you open the chat. Memory is shared with the Claude Desktop instance (same SQLite database at `~/.nodus-mcp-server/data/memory.db`).
+
+---
+
 ## Upgrading
 
 ```
@@ -170,7 +205,7 @@ Stop-Process -Name "nodus-mcp-server" -Force   # Windows — close before reinst
 pipx install nodus-mcp-server --force
 ```
 
-Then restart Claude Desktop.
+Then restart Claude Desktop / ChatGPT Desktop.
 
 ## License
 

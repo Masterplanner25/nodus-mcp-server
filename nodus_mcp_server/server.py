@@ -9,6 +9,7 @@ import sys
 
 from mcp.server import Server
 from mcp.server.stdio import stdio_server
+from mcp.server.sse import SseServerTransport
 from mcp import types
 
 from nodus.runtime.embedding import NodusRuntime
@@ -240,6 +241,37 @@ async def _serve_stdio() -> None:
         await app.run(read_stream, write_stream, app.create_initialization_options())
 
 
+async def _serve_http(host: str, port: int) -> None:
+    import uvicorn
+    from starlette.applications import Starlette
+    from starlette.routing import Mount, Route
+
+    sse = SseServerTransport("/messages/")
+
+    async def handle_sse(request):
+        async with sse.connect_sse(
+            request.scope, request.receive, request._send
+        ) as streams:
+            await app.run(
+                streams[0], streams[1], app.create_initialization_options()
+            )
+
+    starlette_app = Starlette(
+        routes=[
+            Route("/sse", endpoint=handle_sse),
+            Mount("/messages/", app=sse.handle_post_message),
+        ]
+    )
+
+    url = f"http://{host}:{port}/sse"
+    print(f"[nodus-mcp-server] HTTP/SSE listening on {url}", file=sys.stderr)
+    print(f"[nodus-mcp-server] Point ChatGPT / your MCP client at: {url}", file=sys.stderr)
+
+    config = uvicorn.Config(starlette_app, host=host, port=port, log_level="warning")
+    server = uvicorn.Server(config)
+    await server.serve()
+
+
 def main() -> None:
     parser = argparse.ArgumentParser(
         prog="nodus-mcp-server",
@@ -249,20 +281,18 @@ def main() -> None:
     group.add_argument("--stdio", action="store_true",
                        help="Serve on stdin/stdout (Claude Desktop spawned-child mode)")
     group.add_argument("--http", action="store_true",
-                       help="Serve on HTTP")
-    parser.add_argument("--port", type=int, default=8080,
-                        help="HTTP port (default: 8080)")
+                       help="Serve over HTTP/SSE (ChatGPT Desktop and other HTTP MCP clients)")
+    parser.add_argument("--port", type=int, default=8765,
+                        help="HTTP port (default: 8765)")
+    parser.add_argument("--host", default="127.0.0.1",
+                        help="HTTP host (default: 127.0.0.1)")
     args = parser.parse_args()
 
     if args.stdio:
         print("[nodus-mcp-server] serving on stdio", file=sys.stderr)
         asyncio.run(_serve_stdio())
     else:
-        print(
-            f"[nodus-mcp-server] HTTP mode: use 'mcp dev' or 'mcp run' for HTTP transport",
-            file=sys.stderr,
-        )
-        sys.exit(1)
+        asyncio.run(_serve_http(args.host, args.port))
 
 
 if __name__ == "__main__":
