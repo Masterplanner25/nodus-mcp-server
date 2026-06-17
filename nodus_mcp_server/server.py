@@ -241,7 +241,7 @@ async def _serve_stdio() -> None:
         await app.run(read_stream, write_stream, app.create_initialization_options())
 
 
-async def _serve_http(host: str, port: int) -> None:
+async def _serve_http(host: str, port: int, ssl_cert: str | None, ssl_key: str | None) -> None:
     import uvicorn
     from starlette.applications import Starlette
     from starlette.routing import Mount, Route
@@ -263,11 +263,19 @@ async def _serve_http(host: str, port: int) -> None:
         ]
     )
 
-    url = f"http://{host}:{port}/sse"
+    scheme = "https" if ssl_cert else "http"
+    url = f"{scheme}://{host}:{port}/sse"
     print(f"[nodus-mcp-server] HTTP/SSE listening on {url}", file=sys.stderr)
     print(f"[nodus-mcp-server] Point ChatGPT / your MCP client at: {url}", file=sys.stderr)
 
-    config = uvicorn.Config(starlette_app, host=host, port=port, log_level="warning")
+    config = uvicorn.Config(
+        starlette_app,
+        host=host,
+        port=port,
+        log_level="warning",
+        ssl_certfile=ssl_cert or None,
+        ssl_keyfile=ssl_key or None,
+    )
     server = uvicorn.Server(config)
     await server.serve()
 
@@ -286,13 +294,19 @@ def main() -> None:
                         help="HTTP port (default: 8765)")
     parser.add_argument("--host", default="127.0.0.1",
                         help="HTTP host (default: 127.0.0.1)")
+    parser.add_argument("--ssl-cert", default="",
+                        help="Path to SSL certificate file (enables HTTPS)")
+    parser.add_argument("--ssl-key", default="",
+                        help="Path to SSL private key file")
     args = parser.parse_args()
 
     if args.stdio:
         print("[nodus-mcp-server] serving on stdio", file=sys.stderr)
         asyncio.run(_serve_stdio())
     else:
-        asyncio.run(_serve_http(args.host, args.port))
+        ssl_cert = args.ssl_cert or None
+        ssl_key = args.ssl_key or None
+        asyncio.run(_serve_http(args.host, args.port, ssl_cert, ssl_key))
 
 
 if __name__ == "__main__":
