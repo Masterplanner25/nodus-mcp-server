@@ -9,7 +9,7 @@ import sys
 
 from mcp.server import Server
 from mcp.server.stdio import stdio_server
-from mcp.server.sse import SseServerTransport
+from mcp.server.streamable_http_manager import StreamableHTTPSessionManager
 from mcp import types
 
 from nodus.runtime.embedding import NodusRuntime
@@ -250,28 +250,19 @@ async def _serve_stdio() -> None:
 async def _serve_http(host: str, port: int, ssl_cert: str | None, ssl_key: str | None) -> None:
     import uvicorn
     from starlette.applications import Starlette
-    from starlette.routing import Mount, Route
+    from starlette.routing import Mount
 
-    sse = SseServerTransport("/messages/")
-
-    async def handle_sse(request):
-        async with sse.connect_sse(
-            request.scope, request.receive, request._send
-        ) as streams:
-            await app.run(
-                streams[0], streams[1], app.create_initialization_options()
-            )
+    session_manager = StreamableHTTPSessionManager(app)
 
     starlette_app = Starlette(
         routes=[
-            Route("/sse", endpoint=handle_sse),
-            Mount("/messages/", app=sse.handle_post_message),
+            Mount("/mcp", app=session_manager.handle_request),
         ]
     )
 
     scheme = "https" if ssl_cert else "http"
-    url = f"{scheme}://{host}:{port}/sse"
-    print(f"[nodus-mcp-server] HTTP/SSE listening on {url}", file=sys.stderr)
+    url = f"{scheme}://{host}:{port}/mcp"
+    print(f"[nodus-mcp-server] HTTP listening on {url}", file=sys.stderr)
     print(f"[nodus-mcp-server] Point ChatGPT / your MCP client at: {url}", file=sys.stderr)
 
     config = uvicorn.Config(

@@ -167,7 +167,7 @@ workflows/         — .nd workflow definitions (bundled + custom)
 
 ## ChatGPT Desktop setup
 
-ChatGPT uses HTTP/SSE transport. Start the server in HTTP mode, then point ChatGPT at the URL.
+ChatGPT requires a public HTTPS URL (not localhost). Use ngrok to expose the server.
 
 ### 1. Start the HTTP server
 
@@ -177,24 +177,30 @@ nodus-mcp-server --http --port 8765
 
 This prints:
 ```
-[nodus-mcp-server] HTTP/SSE listening on http://127.0.0.1:8765/sse
-[nodus-mcp-server] Point ChatGPT / your MCP client at: http://127.0.0.1:8765/sse
+[nodus-mcp-server] HTTP listening on http://127.0.0.1:8765/mcp
+[nodus-mcp-server] Point ChatGPT / your MCP client at: http://127.0.0.1:8765/mcp
 ```
 
-Keep this terminal open while using ChatGPT.
+### 2. Expose via ngrok
 
-### 2. Connect in ChatGPT Desktop
+```bash
+ngrok http --url=<your-static-domain>.ngrok.io 8765
+```
+
+Keep both terminals open while using ChatGPT.
+
+### 3. Connect in ChatGPT Desktop
 
 1. Click your profile icon → **Settings** → **Apps**
 2. Go to **Advanced Settings** → enable **Developer Mode**
 3. Click **Create App** (or **Connect more**)
-4. Enter a name (e.g. `Nodus`), description, and base URL: `http://127.0.0.1:8765/sse`
+4. Enter a name (e.g. `Nodus`), description, and base URL: `https://<your-static-domain>.ngrok.io/mcp`
 
-### 3. Use in a chat
+### 4. Use in a chat
 
 Open a new chat → click `+` → **More** → **Developer Mode** → enable your Nodus app. The seven `nodus_*` tools are now available.
 
-> **Note:** The HTTP server must be running before you open the chat. Memory is shared with the Claude Desktop instance (same SQLite database at `~/.nodus-mcp-server/data/memory.db`).
+> **Note:** Memory is shared with the Claude Desktop instance (same SQLite database at `~/.nodus-mcp-server/data/memory.db`).
 
 ---
 
