@@ -4,7 +4,7 @@ build-backend = "setuptools.build_meta"
 
 [project]
 name = "nodus-mcp-server"
-version = "0.1.9"
+version = "0.1.10"
 description = "MCP server powered by the Nodus orchestration runtime"
 authors = [{ name = "Shawn Knight", email = "shawnknight@the-master-plan.com" }]
 license = { file = "LICENSE" }

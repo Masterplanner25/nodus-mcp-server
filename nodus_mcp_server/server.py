@@ -89,9 +89,10 @@ _TOOLS = [
     types.Tool(
         name="nodus_run_goal",
         description=(
-            "Execute a pre-defined Nodus goal by name. "
-            "Built-in goals: 'summarize' (params: {text}), 'pipeline' (params: {items, label}). "
-            "Returns structured step results."
+            "Run a single-shot Nodus goal to completion. "
+            "Goals execute a fixed sequence of named steps and return all step results at once — "
+            "use this when the task runs straight through with no need to pause or resume. "
+            "Built-in goals: 'summarize' (params: {text}), 'pipeline' (params: {items, label})."
         ),
         inputSchema={
             "type": "object",
@@ -105,9 +106,12 @@ _TOOLS = [
     types.Tool(
         name="nodus_run_workflow",
         description=(
-            "Execute a pre-defined Nodus workflow by name. "
-            "Built-in workflows: 'research' (params: {topic}). "
-            "Returns graph_id which can be passed to nodus_resume_workflow to resume from a checkpoint."
+            "Start a resumable Nodus workflow. "
+            "Workflows execute step-by-step and save a checkpoint after each step — "
+            "use this when you need to pause mid-execution, inspect intermediate results, "
+            "or resume later from a known point. "
+            "Returns a graph_id; pass it to nodus_resume_workflow to continue from any checkpoint. "
+            "Built-in workflows: 'research' (params: {topic})."
         ),
         inputSchema={
             "type": "object",
@@ -121,9 +125,11 @@ _TOOLS = [
     types.Tool(
         name="nodus_resume_workflow",
         description=(
-            "Resume a Nodus workflow from a checkpoint. "
-            "Pass the graph_id returned by nodus_run_workflow and optionally a checkpoint label. "
-            "Skips already-completed steps and re-runs from the checkpoint."
+            "Resume a previously started Nodus workflow from a checkpoint. "
+            "Skips already-completed steps and re-runs from the checkpoint forward. "
+            "Use this to continue a paused workflow, retry a failed step, or hand off "
+            "execution after reviewing intermediate results. "
+            "Pass the graph_id returned by nodus_run_workflow and optionally a checkpoint label."
         ),
         inputSchema={
             "type": "object",
