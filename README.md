@@ -1,5 +1,7 @@
 # nodus-mcp-server
 
+> **Status:** v0.1.11 — published on [PyPI](https://pypi.org/project/nodus-mcp-server/).
+
 An MCP server that connects AI assistants to the [Nodus](https://github.com/Masterplanner25/Nodus) language runtime — giving them persistent memory, sandboxed code execution, and checkpoint/resume orchestration workflows, all powered by `.nd` scripts running on the Nodus VM.
 
 Supports **Claude Desktop** (stdio) and **ChatGPT Desktop** (HTTP/SSE).
