@@ -247,18 +247,41 @@ async def _serve_stdio() -> None:
         await app.run(read_stream, write_stream, app.create_initialization_options())
 
 
-async def _serve_http(host: str, port: int, ssl_cert: str | None, ssl_key: str | None) -> None:
-    import uvicorn
+def build_http_app():
+    """The ASGI app `--http` serves: the MCP session manager mounted at /mcp.
+
+    `StreamableHTTPSessionManager` must be *running* -- its task group is
+    created inside `run()` -- or every request fails with
+    ``RuntimeError: Task group is not initialized. Make sure to use run()``.
+    0.1.11 swapped this manager in to fix a `TypeError` on every request and
+    never entered `run()`, so every request still failed, differently. The
+    manager's lifetime is the app's lifespan now, which is the one place uvicorn
+    (and Starlette's `TestClient`) will start and stop it.
+    """
+    from contextlib import asynccontextmanager
+
     from starlette.applications import Starlette
     from starlette.routing import Mount
 
     session_manager = StreamableHTTPSessionManager(app)
 
-    starlette_app = Starlette(
+    @asynccontextmanager
+    async def lifespan(_app):
+        async with session_manager.run():
+            yield
+
+    return Starlette(
         routes=[
             Mount("/mcp", app=session_manager.handle_request),
-        ]
+        ],
+        lifespan=lifespan,
     )
+
+
+async def _serve_http(host: str, port: int, ssl_cert: str | None, ssl_key: str | None) -> None:
+    import uvicorn
+
+    starlette_app = build_http_app()
 
     scheme = "https" if ssl_cert else "http"
     url = f"{scheme}://{host}:{port}/mcp"

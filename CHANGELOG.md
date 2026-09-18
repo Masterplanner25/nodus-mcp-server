@@ -6,6 +6,26 @@ Versioning: [Semantic Versioning](https://semver.org)
 This file starts at 0.1.12. Releases 0.1.0–0.1.11 predate it; their history is in
 the git log and the GitHub releases.
 
+## [0.1.13] — 2026-09-17
+
+### Fixed
+
+- **`--http` mode answered every request with a 500.** 0.1.11 replaced the
+  SSE transport with `StreamableHTTPSessionManager` to fix a `TypeError` on
+  every request, and never entered the manager's `run()` — its task group is
+  created there, and without it every POST to `/mcp` raised
+  `RuntimeError: Task group is not initialized. Make sure to use run()`. The
+  process started, printed its URL, and served nothing; ChatGPT-over-ngrok,
+  the mode's whole purpose, could not complete `initialize`. The manager now
+  runs for the app's lifespan (`build_http_app()`), which is what uvicorn and
+  Starlette's `TestClient` both start and stop.
+
+  `tests/test_http_transport.py` completes a real `initialize` → `tools/list`
+  through the app, and pins the unrun shape as a 500 so the reading is not
+  lore. Nothing drove the HTTP app before; both transport fixes shipped on the
+  strength of the process starting. stdio mode (Claude Desktop) was never
+  affected.
+
 ## [0.1.12] — 2026-08-17
 
 ### Changed
