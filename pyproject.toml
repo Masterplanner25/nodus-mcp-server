@@ -20,7 +20,11 @@ classifiers = [
 ]
 dependencies = [
   "nodus-lang>=4.0.5",
-  "mcp>=1.0.0",
+  # <2: mcp 2.0 removed the low-level `@app.list_tools()` / `@app.call_tool()`
+  # decorator API this server is written against; a fresh install resolved 2.2.0
+  # and failed at import in both modes. >=1.8: StreamableHTTPSessionManager
+  # first shipped there. Port to 2.x tracked in issue #3.
+  "mcp>=1.8,<2",
 ]
 
 [project.scripts]
