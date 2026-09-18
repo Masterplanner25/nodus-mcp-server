@@ -26,6 +26,17 @@ the git log and the GitHub releases.
   strength of the process starting. stdio mode (Claude Desktop) was never
   affected.
 
+### Changed
+
+- **`mcp` is pinned `>=1.8,<2`** (was `>=1.0.0`). Found by installing the
+  0.1.13 wheel into a clean venv before uploading it: pip resolved `mcp`
+  2.2.0, which removed the low-level `@app.list_tools()` / `@app.call_tool()`
+  decorator API, and `import nodus_mcp_server.server` failed — in **both**
+  modes. Every fresh install since mcp 2.0 shipped has been broken at import;
+  an install that resolved 1.x earlier keeps working, which is why nobody saw
+  it. 1.8 is where `StreamableHTTPSessionManager` first appeared. The 2.x
+  port is issue #3.
+
 ## [0.1.12] — 2026-08-17
 
 ### Changed
