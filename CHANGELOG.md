@@ -6,6 +6,23 @@ Versioning: [Semantic Versioning](https://semver.org)
 This file starts at 0.1.12. Releases 0.1.0–0.1.11 predate it; their history is in
 the git log and the GitHub releases.
 
+## [0.1.14] — 2026-09-18
+
+### Fixed
+
+- **Works with the mcp SDK 2.x** (#3). The server registered its two handlers
+  through the 1.x decorator API (`@app.list_tools()` / `@app.call_tool()`),
+  which mcp 2.0 removed, so with mcp ≥ 2.0 installed `import
+  nodus_mcp_server.server` failed — both transports. 0.1.13 pinned `mcp<2` as
+  the stopgap; the pin is lifted to `mcp>=1.8`.
+
+  One implementation with a branch per SDK major, chosen once at import
+  (`_SDK_V2`): on 2.x the handlers go through `add_request_handler`, take
+  `(ctx, params)` and return result models; 1.x is unchanged. The same port as
+  nodus-mcp 0.1.4 (nodus-mcp#11), so the two servers do not drift. Both
+  branches are driven by `tests/test_http_transport.py`'s real `initialize` →
+  `tools/list` through the ASGI app: 27/27 under mcp 1.27 and under 2.2.
+
 ## [0.1.13] — 2026-09-17
 
 ### Fixed
