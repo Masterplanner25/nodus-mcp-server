@@ -159,13 +159,8 @@ _TOOLS = [
 ]
 
 
-@app.list_tools()
-async def list_tools() -> list[types.Tool]:
-    return _TOOLS
-
-
-@app.call_tool()
-async def call_tool(name: str, arguments: dict) -> list[types.TextContent]:
+def _dispatch(name: str, arguments: dict | None) -> list[types.TextContent]:
+    """One tool call -> text content. Transport- and SDK-agnostic."""
     handlers = {
         "nodus_remember": _remember,
         "nodus_recall": _recall,
@@ -179,8 +174,39 @@ async def call_tool(name: str, arguments: dict) -> list[types.TextContent]:
     if handler is None:
         result: dict = {"error": f"Unknown tool: {name}"}
     else:
-        result = handler(arguments)
+        result = handler(dict(arguments or {}))
     return [types.TextContent(type="text", text=json.dumps(result))]
+
+
+#: Which SDK generation is installed (#3). mcp 2.0 removed the decorator
+#: registration (`@app.list_tools()` / `@app.call_tool()`); a handler is
+#: registered with `add_request_handler(method, params_type, handler)`, takes
+#: `(ctx, params)` and returns a result model. One question, answered once;
+#: both branches are driven by the same tests through a real client
+#: (`tests/test_http_transport.py`), and the same port as nodus-mcp#11 so the
+#: two servers do not drift.
+_SDK_V2 = hasattr(Server, "add_request_handler")
+
+if _SDK_V2:
+
+    async def _list_tools_v2(ctx, params) -> types.ListToolsResult:
+        return types.ListToolsResult(tools=_TOOLS)
+
+    async def _call_tool_v2(ctx, params) -> types.CallToolResult:
+        return types.CallToolResult(content=_dispatch(params.name, params.arguments))
+
+    app.add_request_handler("tools/list", types.PaginatedRequestParams, _list_tools_v2)
+    app.add_request_handler("tools/call", types.CallToolRequestParams, _call_tool_v2)
+
+else:
+
+    @app.list_tools()
+    async def list_tools() -> list[types.Tool]:
+        return _TOOLS
+
+    @app.call_tool()
+    async def call_tool(name: str, arguments: dict) -> list[types.TextContent]:
+        return _dispatch(name, arguments)
 
 
 # ── Tool handlers ─────────────────────────────────────────────────────────────

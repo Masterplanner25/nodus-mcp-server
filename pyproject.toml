@@ -4,7 +4,7 @@ build-backend = "setuptools.build_meta"
 
 [project]
 name = "nodus-mcp-server"
-version = "0.1.13"
+version = "0.1.14"
 description = "MCP server powered by the Nodus orchestration runtime"
 authors = [{ name = "Shawn Knight", email = "shawnknight@the-master-plan.com" }]
 license = { file = "LICENSE" }
@@ -20,11 +20,9 @@ classifiers = [
 ]
 dependencies = [
   "nodus-lang>=4.0.5",
-  # <2: mcp 2.0 removed the low-level `@app.list_tools()` / `@app.call_tool()`
-  # decorator API this server is written against; a fresh install resolved 2.2.0
-  # and failed at import in both modes. >=1.8: StreamableHTTPSessionManager
-  # first shipped there. Port to 2.x tracked in issue #3.
-  "mcp>=1.8,<2",
+  # >=1.8: StreamableHTTPSessionManager first shipped there. Both SDK majors
+  # are supported since 0.1.14 (#3); the branch is chosen once in server.py.
+  "mcp>=1.8",
 ]
 
 [project.scripts]
