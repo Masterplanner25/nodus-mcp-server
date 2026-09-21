@@ -66,6 +66,18 @@ def test_initialize_and_list_tools_over_http():
         names = {t["name"] for t in _first_json(resp)["result"]["tools"]}
         assert {"nodus_remember", "nodus_run_goal", "nodus_run_workflow", "nodus_exec"} <= names, names
 
+        # A tool call *through* the transport. `test_runner.py` drives the
+        # runner directly and this file drove the handshake; neither ran a
+        # tool over MCP, and the two halves have broken independently
+        # (0.1.11, 0.1.13). The product of the two is what a client does.
+        resp = client.post("/mcp/", headers=headers, json={
+            "jsonrpc": "2.0", "id": 3, "method": "tools/call",
+            "params": {"name": "nodus_exec", "arguments": {"code": "print(6i * 7i)"}},
+        })
+        assert resp.status_code == 200, resp.text
+        payload = json.loads(_first_json(resp)["result"]["content"][0]["text"])
+        assert payload == {"ok": True, "stdout": "42"}, payload
+
 
 def test_the_app_needs_its_lifespan():
     """What 0.1.11/0.1.12 shipped: the manager mounted but never run."""
