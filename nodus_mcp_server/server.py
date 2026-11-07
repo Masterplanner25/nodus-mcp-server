@@ -13,8 +13,8 @@ from mcp.server.streamable_http_manager import StreamableHTTPSessionManager
 from mcp import types
 
 from nodus.runtime.embedding import NodusRuntime
+from . import __version__, runner
 from .memory_store import MemoryStore
-from . import runner
 
 _DATA_DIR = os.path.join(os.path.expanduser("~"), ".nodus-mcp-server", "data")
 os.makedirs(_DATA_DIR, exist_ok=True)
@@ -31,10 +31,12 @@ _exec_runtime = NodusRuntime(
     allowed_paths=[],
     allow_network=False,
     allow_subprocess=False,
+    allow_env=False,
 )
 _store = MemoryStore(os.path.join(_DATA_DIR, "memory.db"))
 
-app = Server("nodus-mcp-server")
+# Without a version the SDK reports its own, so clients saw mcp's version here.
+app = Server("nodus-mcp-server", version=__version__)
 
 _TOOLS = [
     types.Tool(
@@ -144,7 +146,7 @@ _TOOLS = [
         name="nodus_exec",
         description=(
             "Execute arbitrary Nodus (.nd) code in a sandboxed runtime "
-            "(no file I/O, no network, no subprocess, 10s timeout). "
+            "(no file I/O, no network, no subprocess, no environment variables, 10s timeout). "
             "Output is captured via print() — use print(value) to surface results. "
             "Top-level return is not supported; use print() instead."
         ),

@@ -4,7 +4,7 @@ build-backend = "setuptools.build_meta"
 
 [project]
 name = "nodus-mcp-server"
-version = "0.1.14"
+dynamic = ["version"]
 description = "MCP server powered by the Nodus orchestration runtime"
 authors = [{ name = "Shawn Knight", email = "shawnknight@the-master-plan.com" }]
 license = { file = "LICENSE" }
@@ -19,7 +19,10 @@ classifiers = [
   "Topic :: Software Development :: Libraries :: Application Frameworks",
 ]
 dependencies = [
-  "nodus-lang>=4.0.5",
+  # >=5.15.0: 5.6.0 added the declared parameters resume depends on, and 5.15.0
+  # keeps a run's bounds across a resume. Below 5.0.0 embedded code could read
+  # and change the process environment by default.
+  "nodus-lang>=5.15.0",
   # >=1.8: StreamableHTTPSessionManager first shipped there. Both SDK majors
   # are supported since 0.1.14 (#3); the branch is chosen once in server.py.
   "mcp>=1.8",
@@ -32,6 +35,9 @@ nodus-mcp-server = "nodus_mcp_server.server:main"
 Homepage = "https://github.com/Masterplanner25/nodus-mcp-server"
 Repository = "https://github.com/Masterplanner25/nodus-mcp-server"
 Issues = "https://github.com/Masterplanner25/nodus-mcp-server/issues"
+
+[tool.setuptools.dynamic]
+version = { attr = "nodus_mcp_server.__version__" }
 
 [tool.setuptools.packages.find]
 where = ["."]

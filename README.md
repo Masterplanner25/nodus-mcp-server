@@ -1,6 +1,6 @@
 # nodus-mcp-server
 
-> **Status:** v0.1.11 — published on [PyPI](https://pypi.org/project/nodus-mcp-server/).
+> **Status:** published on [PyPI](https://pypi.org/project/nodus-mcp-server/).
 
 An MCP server that connects AI assistants to the [Nodus](https://github.com/Masterplanner25/Nodus) language runtime — giving them persistent memory, sandboxed code execution, and checkpoint/resume orchestration workflows, all powered by `.nd` scripts running on the Nodus VM.
 
@@ -16,7 +16,7 @@ Supports **Claude Desktop** (stdio) and **ChatGPT Desktop** (HTTP/SSE).
 | `nodus_run_goal` | Run a built-in Nodus goal (structured multi-step result) |
 | `nodus_run_workflow` | Run a built-in Nodus workflow (returns a `graph_id` for resuming) |
 | `nodus_resume_workflow` | Resume a workflow from a checkpoint using its `graph_id` |
-| `nodus_exec` | Execute arbitrary Nodus code in a sandbox (no file I/O, no network, no subprocess, 10 s timeout) |
+| `nodus_exec` | Execute arbitrary Nodus code in a sandbox (no file I/O, no network, no subprocess, no environment variables, 10 s timeout) |
 
 ## Requirements
 
@@ -91,7 +91,7 @@ Run Nodus (`.nd`) code in a fully sandboxed runtime:
 Use nodus_exec to run: print("Hello from Nodus!")
 ```
 
-The sandbox enforces: no file I/O, no network, no subprocess. Use `print()` to surface results — top-level return values are not captured.
+The sandbox enforces: no file I/O, no network, no subprocess, no environment variables. Use `print()` to surface results — top-level return values are not captured.
 
 ### Goals (structured multi-step tasks)
 
@@ -148,7 +148,19 @@ Then call it:
 {"name": "my_goal", "params": {"input_text": "hello"}}
 ```
 
-Input `params` are injected as top-level variables in the `.nd` execution context. Check `nil` before using them — missing params surface as `nil`, not an error, unless you throw explicitly.
+For a goal, `params` are injected as top-level variables in the `.nd` execution context. Check `nil` before using them — missing params surface as `nil`, not an error, unless you throw explicitly.
+
+A workflow declares its params instead, so they are stored with the run and restored when it resumes. A missing or unknown param is an error:
+
+```nodus
+// workflows/my_workflow.nd
+workflow my_workflow(input_text) {
+    step process {
+        checkpoint "processed"
+        return {"length": len(input_text)}
+    }
+}
+```
 
 See the [Nodus language guide](https://github.com/Masterplanner25/Nodus/tree/main/docs/guide) for the full `.nd` syntax reference.
 
@@ -168,6 +180,8 @@ workflows/         — .nd workflow definitions (bundled + custom)
 ```
 
 ## ChatGPT Desktop setup
+
+> **This server has no authentication.** Anyone who can reach its URL can use every tool: read, change and delete your memory, and run code in the `nodus_exec` sandbox. Do not publish the URL, and stop the tunnel when you are not using it. By default `--http` listens only on `127.0.0.1`.
 
 ChatGPT requires a public HTTPS URL (not localhost). Use ngrok to expose the server.
 
@@ -189,7 +203,7 @@ This prints:
 ngrok http --url=<your-static-domain>.ngrok.io 8765
 ```
 
-Keep both terminals open while using ChatGPT.
+Keep both terminals open while using ChatGPT, and close them when you finish.
 
 ### 3. Connect in ChatGPT Desktop
 

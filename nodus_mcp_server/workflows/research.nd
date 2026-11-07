@@ -2,7 +2,7 @@
 // Demonstrates checkpoint/resume: the plan step checkpoints its output so
 // the workflow can be resumed from "planned" without re-running planning.
 
-workflow research {
+workflow research(topic) {
     step plan {
         let query = topic
         checkpoint "planned"
