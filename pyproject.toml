@@ -19,13 +19,18 @@ classifiers = [
   "Topic :: Software Development :: Libraries :: Application Frameworks",
 ]
 dependencies = [
-  # >=5.15.0: 5.6.0 added the declared parameters resume depends on, and 5.15.0
-  # keeps a run's bounds across a resume. Below 5.0.0 embedded code could read
-  # and change the process environment by default.
-  "nodus-lang>=5.15.0",
-  # >=1.8: StreamableHTTPSessionManager first shipped there. Both SDK majors
-  # are supported since 0.1.14 (#3); the branch is chosen once in server.py.
-  "mcp>=1.8",
+  # >=5.15.1: 5.6.0 added the declared parameters resume depends on, 5.15.0 keeps
+  # a run's bounds across a resume, and 5.15.1 is the first release that imports
+  # on Python 3.10 (nodus-lang #893 — 5.15.0's bare `import tomllib` broke it), so
+  # the floor must be 5.15.1 for this package's own 3.10 claim to hold. Below 5.0.0
+  # embedded code could read and change the process environment by default.
+  "nodus-lang>=5.15.1",
+  # >=1.22.0: StreamableHTTPSessionManager first shipped in 1.8, but mcp below
+  # 1.22 imports `eval_type_backport` from `pydantic._internal._typing_extra`,
+  # which pydantic 2.14 removed, so `import mcp` fails on a current install. 1.22
+  # is the lowest release that imports with current pydantic. Both SDK majors are
+  # supported since 0.1.14 (#3); the branch is chosen once in server.py.
+  "mcp>=1.22.0",
 ]
 
 [project.scripts]

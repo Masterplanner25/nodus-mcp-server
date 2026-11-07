@@ -88,11 +88,18 @@ language version.
 - **Keep `include = ["nodus_mcp_server*"]` in pyproject.** Without it the wheel ships
   a top-level `tests` package into `site-packages` (#8). The `package` CI job fails if
   it regresses.
-- **Python 3.10 needs `nodus-lang>=5.15.1`, though the declared floor is `>=5.15.0`.**
-  nodus-lang 5.15.0 has a bare `import tomllib` that breaks every 3.10 install (#893,
-  fixed in 5.15.1). On 3.10 pip resolves the latest ≥5.15.0 (i.e. 5.15.1) and is fine,
-  but a user pinning 5.15.0 on 3.10 breaks. Raising the floor to `>=5.15.1` (a 0.1.16
-  release) is the honest fix if the 3.10 claim needs to be airtight.
+- **The `mcp` floor is `>=1.22.0`, and it is pydantic-driven, not feature-driven.**
+  mcp below 1.22 imports `eval_type_backport` from `pydantic._internal._typing_extra`,
+  which pydantic 2.14 removed, so `import mcp` fails on a current install. 1.22.0 is
+  the lowest release that imports with current pydantic and still has
+  `StreamableHTTPSessionManager`. The CI floor cell pins `mcp==1.22.0`; if a future
+  pydantic breaks 1.22, re-bisect and raise the floor again (0.1.16 found this by
+  re-running CI once nodus-lang 5.15.1 unmasked it).
+- **The `nodus-lang` floor is `>=5.15.1`** because 5.15.0's bare `import tomllib`
+  breaks every Python 3.10 install (nodus-lang #893); 5.15.1 is the first that imports
+  on 3.10, so the floor must be 5.15.1 for this package's `requires-python = ">=3.10"`
+  to hold. Do **not** add an upper cap on nodus-lang (ecosystem policy — the suite
+  catches a real break; a cap earns its place once a break is known).
 
 ## PR workflow
 
