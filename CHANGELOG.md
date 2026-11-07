@@ -6,6 +6,32 @@ Versioning: [Semantic Versioning](https://semver.org)
 This file starts at 0.1.12. Releases 0.1.0–0.1.11 predate it; their history is in
 the git log and the GitHub releases.
 
+## [0.1.16] — 2026-11-07
+
+### Changed
+
+- **Raised the `mcp` floor to `>=1.22.0`** (was `>=1.8`). mcp below 1.22 imports
+  `eval_type_backport` from `pydantic._internal._typing_extra`, which current
+  pydantic (2.14) no longer exposes, so `import mcp` failed at collection — the
+  declared floor did not actually install. 1.22.0 is the lowest release that
+  imports with current pydantic and still carries `StreamableHTTPSessionManager`
+  (the reason for the 1.8 floor). The suite passes against it (45 tests).
+
+  Surfaced by CI: once nodus-lang 5.15.1 fixed the Python 3.10 import (its #893),
+  the previously-masked 3.10 floor cell revealed this. The CI floor cell now pins
+  `mcp==1.22.0`.
+
+- **Raised the `nodus-lang` floor to `>=5.15.1`** (was `>=5.15.0`). 5.15.0 has a
+  bare `import tomllib` that breaks every Python 3.10 install (nodus-lang #893);
+  5.15.1 is the first release that imports on 3.10, so the floor must be 5.15.1
+  for this package's own `requires-python = ">=3.10"` to hold.
+
+### Added
+
+- **A CI workflow** (#9): a matrix of OS {ubuntu, windows} × Python {3.10, 3.13}
+  × mcp {1.x, 2.x} plus the declared floor, and a package job that builds the
+  wheel and completes a real `initialize` handshake against the installed server.
+
 ## [0.1.15] — 2026-11-06
 
 ### Security
