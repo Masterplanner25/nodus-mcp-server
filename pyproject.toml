@@ -41,6 +41,7 @@ version = { attr = "nodus_mcp_server.__version__" }
 
 [tool.setuptools.packages.find]
 where = ["."]
+include = ["nodus_mcp_server*"]
 
 [tool.setuptools.package-data]
 nodus_mcp_server = ["goals/*.nd", "workflows/*.nd"]
