@@ -168,6 +168,8 @@ See the [Nodus language guide](https://github.com/Masterplanner25/Nodus/tree/mai
 
 The goals, workflows, and `nodus_exec` sandbox all run on the [Nodus](https://github.com/Masterplanner25/Nodus) VM — a lightweight, embeddable language runtime designed for AI-native orchestration. Nodus scripts (`.nd` files) define the step logic; the MCP server wires them to Claude over the Model Context Protocol.
 
+This package is part of the **Nodus ecosystem** — a family of companion libraries built around the [`nodus-lang`](https://pypi.org/project/nodus-lang/) runtime (MCP and A2A servers, an SDK, memory and workflow engines, and more; see the [ecosystem overview](https://github.com/Masterplanner25/Nodus/blob/main/docs/ecosystem/README.md)). The runtime's own suite runs this server's tests on every release, so an upstream change that would break it is caught before it ships.
+
 ## Architecture
 
 ```
@@ -228,6 +230,17 @@ pipx install nodus-mcp-server --force
 ```
 
 Then restart Claude Desktop / ChatGPT Desktop.
+
+## Development
+
+```
+git clone https://github.com/Masterplanner25/nodus-mcp-server
+cd nodus-mcp-server
+python -m pip install . mcp pytest httpx
+python -m pytest -q
+```
+
+CI runs the suite across a matrix of OS (Ubuntu, Windows), Python (3.10 and 3.13 — the ends of `requires-python`), and the `mcp` SDK (1.x and 2.x, since the server branches on the SDK major). A separate job builds the wheel and completes a real `initialize` handshake against the installed server. `main` is branch-protected: changes land through a branch, a pull request, and green CI.
 
 ## License
 
