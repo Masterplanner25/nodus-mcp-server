@@ -31,6 +31,7 @@ the git log and the GitHub releases.
   the workflow with none. `research` now declares `topic` as a workflow parameter,
   which nodus-lang stores with the run and restores on resume.
 - **`serverInfo.version` reported the mcp SDK's version**, not this package's.
+- **The wheel no longer installs a top-level `tests` package** into `site-packages`.
 
 ### Changed
 
