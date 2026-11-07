@@ -2,6 +2,7 @@
 from __future__ import annotations
 
 import os
+import re
 from typing import Any
 
 from nodus.vm.vm import VM
@@ -13,6 +14,11 @@ from nodus.support.config import MAX_STEPS, MAX_STDOUT_CHARS
 _HERE = os.path.dirname(os.path.abspath(__file__))
 GOALS_DIR = os.path.join(_HERE, "goals")
 WORKFLOWS_DIR = os.path.join(_HERE, "workflows")
+
+#: nodus-lang builds a state file's path from the graph id without checking it,
+#: and this id comes straight from the MCP client, so `../../x` would load any
+#: `.json` file the process can read. Real ids are `g_` plus hex.
+_GRAPH_ID_RE = re.compile(r"[A-Za-z0-9_-]{1,128}")
 
 
 def _load(directory: str, name: str, kind: str) -> tuple[str, str]:
@@ -84,13 +90,15 @@ def run_workflow(runtime: Any, name: str, params: dict) -> dict:
     except FileNotFoundError as exc:
         return {"ok": False, "error": str(exc)}
     try:
-        vm, def_stdout = _load_into_vm(code, path, params, timeout_ms=60_000)
+        vm, def_stdout = _load_into_vm(code, path, {}, timeout_ms=60_000)
     except Exception as exc:
         return {"ok": False, "error": str(exc)}
     try:
         workflow = _resolve_workflow_from_vm(vm, name)
         with capture_output(max_stdout_chars=MAX_STDOUT_CHARS) as (run_out, _):
-            wf_result = vm.builtin_run_workflow(workflow)
+            # Bound as declared parameters, not injected as globals: nodus-lang
+            # keeps them in the run record and restores them on resume.
+            wf_result = vm.builtin_run_workflow(workflow, params or None)
     except Exception as exc:
         return {"ok": False, "error": str(exc)}
     combined_stdout = (def_stdout + run_out.getvalue()).strip()
@@ -114,6 +122,9 @@ def run_workflow(runtime: Any, name: str, params: dict) -> dict:
 
 def resume_workflow_tool(graph_id: str, checkpoint: str | None) -> dict:
     from nodus.orchestration.task_graph import load_graph_state
+
+    if not _GRAPH_ID_RE.fullmatch(graph_id):
+        return {"ok": False, "error": "invalid graph_id"}
 
     # Find the workflow name from persisted state so we can reload the definition.
     state = load_graph_state(graph_id)

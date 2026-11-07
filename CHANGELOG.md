@@ -6,6 +6,41 @@ Versioning: [Semantic Versioning](https://semver.org)
 This file starts at 0.1.12. Releases 0.1.0–0.1.11 predate it; their history is in
 the git log and the GitHub releases.
 
+## [0.1.15] — 2026-11-06
+
+### Security
+
+- **This server has no authentication, and the README now says so.** Anyone who can
+  reach `--http` can use every tool: read, change and delete memory, and run code in
+  the `nodus_exec` sandbox. The ChatGPT setup told readers to expose it through ngrok
+  without saying that. If you have a tunnel running, stop it when you are not using it.
+- **`nodus_exec` could read and change the server's environment variables** when
+  installed with nodus-lang below 5.0.0, which `nodus-lang>=4.0.5` allowed and which
+  an older install keeps through an upgrade. `allow_env` was never set, so it took
+  that version's default of on. It is now denied explicitly and the floor is raised.
+  Files, network and subprocess were already denied.
+- **`nodus_resume_workflow` took any string as a `graph_id`**, and nodus-lang builds
+  a file path from it, so `../../x` loaded a `.json` file outside the state directory.
+  The contents were not returned, but the reply showed whether the file existed. An
+  id must now be letters, digits, `_` or `-`.
+
+### Fixed
+
+- **`nodus_resume_workflow` failed on the built-in workflow** with `Undefined variable:
+  topic`, from every checkpoint. Params were injected as globals, and a resume reloads
+  the workflow with none. `research` now declares `topic` as a workflow parameter,
+  which nodus-lang stores with the run and restores on resume.
+- **`serverInfo.version` reported the mcp SDK's version**, not this package's.
+
+### Changed
+
+- **Workflow params must now be declared.** `nodus_run_workflow` binds them to the
+  workflow's parameters, so a missing or unknown param is an error, and a custom
+  workflow must be written `workflow name(param) { ... }`. Goals are unchanged.
+  Runs saved by 0.1.14 or earlier cannot be resumed; they never could.
+- **Requires `nodus-lang>=5.15.0`**, which keeps a run's bounds across a resume.
+- The version now has one source, `nodus_mcp_server.__version__`.
+
 ## [0.1.14] — 2026-09-18
 
 ### Fixed

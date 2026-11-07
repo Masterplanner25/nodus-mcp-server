@@ -16,6 +16,7 @@ import json
 import pytest
 from starlette.testclient import TestClient
 
+import nodus_mcp_server
 from nodus_mcp_server import server
 
 HEADERS = {
@@ -52,6 +53,8 @@ def test_initialize_and_list_tools_over_http():
         assert resp.status_code == 200, resp.text
         msg = _first_json(resp)
         assert msg["id"] == 1 and "serverInfo" in msg["result"], msg
+        # Without an explicit version the SDK reports its own (1.28.0 under 0.1.14).
+        assert msg["result"]["serverInfo"]["version"] == nodus_mcp_server.__version__, msg
         session = resp.headers.get("mcp-session-id")
         assert session, "the server must issue a session id on initialize"
 
