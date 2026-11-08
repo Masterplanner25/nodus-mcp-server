@@ -4,7 +4,7 @@
 
 An MCP server that connects AI assistants to the [Nodus](https://github.com/Masterplanner25/Nodus) language runtime — giving them persistent memory, sandboxed code execution, and checkpoint/resume orchestration workflows, all powered by `.nd` scripts running on the Nodus VM.
 
-Supports **Claude Desktop** (stdio) and **ChatGPT Desktop** (HTTP/SSE).
+Supports **Claude Desktop** (stdio) and **ChatGPT Desktop** (streamable HTTP at `/mcp`, through a tunnel).
 
 ## Tools
 
@@ -185,7 +185,7 @@ workflows/         — .nd workflow definitions (bundled + custom)
 
 > **This server has no authentication.** Anyone who can reach its URL can use every tool: read, change and delete your memory, and run code in the `nodus_exec` sandbox. Do not publish the URL, and stop the tunnel when you are not using it. By default `--http` listens only on `127.0.0.1`.
 
-ChatGPT requires a public HTTPS URL (not localhost). Use ngrok to expose the server.
+ChatGPT calls the server from OpenAI's cloud, not from your machine, so it needs a public HTTPS URL. It cannot use `localhost` or `127.0.0.1`. Use ngrok to expose the server.
 
 ### 1. Start the HTTP server
 
@@ -198,6 +198,8 @@ This prints:
 [nodus-mcp-server] HTTP listening on http://127.0.0.1:8765/mcp
 [nodus-mcp-server] Point ChatGPT / your MCP client at: http://127.0.0.1:8765/mcp
 ```
+
+That is the **local** address. A local MCP client can use it directly, but ChatGPT needs the tunnel URL from step 2.
 
 ### 2. Expose via ngrok
 
@@ -213,6 +215,8 @@ Keep both terminals open while using ChatGPT, and close them when you finish.
 2. Go to **Advanced Settings** → enable **Developer Mode**
 3. Click **Create App** (or **Connect more**)
 4. Enter a name (e.g. `Nodus`), description, and base URL: `https://<your-static-domain>.ngrok.io/mcp`
+
+> **Created the app before 0.1.11?** Its URL probably ends in `/sse`. 0.1.11 replaced the SSE transport with streamable HTTP at `/mcp`, and `/sse` now returns 404, so ChatGPT can no longer reach the server. ChatGPT's app settings have no field for changing the URL: delete the app and create it again with the `/mcp` URL.
 
 ### 4. Use in a chat
 
