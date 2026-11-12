@@ -95,6 +95,18 @@ language version.
   `StreamableHTTPSessionManager`. The CI floor cell pins `mcp==1.22.0`; if a future
   pydantic breaks 1.22, re-bisect and raise the floor again (0.1.16 found this by
   re-running CI once nodus-lang 5.15.1 unmasked it).
+
+  **How to bisect it.** For each candidate `V`, in a throwaway venv with a current
+  pydantic:
+  - `pip install "mcp==V"`, then `import nodus_mcp_server.server`. That module imports
+    `mcp.server`, `mcp.server.stdio`, `StreamableHTTPSessionManager` and `mcp.types`
+    at the top, so the probe exercises the real imports, not `import mcp` alone.
+  - Read the installed version with `importlib.metadata.version("mcp")`, not
+    `mcp.__version__`. The failure happens inside `import mcp`, so a probe that reads
+    the version from the module dies before its own `try` can report which `V` broke.
+
+  The lowest `V` that imports cleanly *and* still has `StreamableHTTPSessionManager` is
+  the floor. Update `pyproject.toml` and the CI floor cell together.
 - **The `nodus-lang` floor is `>=5.15.1`** because 5.15.0's bare `import tomllib`
   breaks every Python 3.10 install (nodus-lang #893); 5.15.1 is the first that imports
   on 3.10, so the floor must be 5.15.1 for this package's `requires-python = ">=3.10"`
