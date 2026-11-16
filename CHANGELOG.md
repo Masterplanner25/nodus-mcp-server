@@ -6,7 +6,7 @@ Versioning: [Semantic Versioning](https://semver.org)
 This file starts at 0.1.12. Releases 0.1.0–0.1.11 predate it; their history is in
 the git log and the GitHub releases.
 
-## [Unreleased]
+## [0.2.1] — 2026-11-16
 
 ### Fixed
 
