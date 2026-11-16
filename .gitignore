@@ -11,3 +11,6 @@ build/
 
 # Server data (SQLite memory DB — persistent, not tracked)
 data/
+
+# Local session handoff notes (never commit)
+Session Handoff Summary.md
