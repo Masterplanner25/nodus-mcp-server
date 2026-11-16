@@ -6,6 +6,47 @@ Versioning: [Semantic Versioning](https://semver.org)
 This file starts at 0.1.12. Releases 0.1.0–0.1.11 predate it; their history is in
 the git log and the GitHub releases.
 
+## [0.2.0] — Unreleased
+
+### Added
+
+- **Sign-in for `--http`** (`--public-url`), so the server can sit behind a
+  public URL that claude.ai and ChatGPT reach. With it, the server is its own
+  OAuth 2.1 authorization server, built on the `mcp` SDK's auth handlers:
+  dynamic client registration (open, capped at 50 clients, rate-limited),
+  authorization code with PKCE (`S256` only), a consent page, and token,
+  refresh and revocation endpoints, plus both metadata documents. `/mcp`, and
+  everything under it, then needs a bearer token. A `401` points clients at
+  the protected-resource metadata.
+  - The owner signs in with a passphrase, set with
+    `nodus-mcp-server set-passphrase` and stored as a scrypt hash. Setting a new
+    one ends every grant.
+  - Tokens are opaque and stored as SHA-256 hashes. Access tokens last an hour.
+    Refresh tokens last 30 days and rotate on every use, and replaying a rotated
+    one revokes the grant. Codes are single-use and last 60 seconds, and reusing
+    one revokes its grant.
+  - Scopes are per tool (`memory.read`, `memory.write`, `workflow.run`, `exec`).
+    `tools/list` shows only what the token may call. `tools/call` refuses
+    anything else with an error naming the missing scope. Only `memory.read` is
+    ticked by default.
+  - **`nodus_exec` is not offered over the public URL** unless the server runs
+    with `--allow-remote-exec`. Turning the flag off takes `exec` away from
+    tokens already issued.
+  - `nodus-mcp-server grants list | revoke <id>` shows and ends grants.
+  - With `--public-url`, the MCP transport checks `Host` and `Origin`, and
+    allows the public host plus loopback.
+
+### Changed
+
+- `--http` help text says "streamable HTTP at /mcp", not "HTTP/SSE".
+- `--http` without `--public-url` no longer tells you to point ChatGPT at the
+  localhost URL. It says the endpoint has no sign-in and that remote clients
+  need `--public-url`.
+
+### Unchanged
+
+- stdio, and `--http` without `--public-url`, behave exactly as in 0.1.16.
+
 ## [0.1.16] — 2026-11-07
 
 ### Changed

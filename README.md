@@ -4,7 +4,7 @@
 
 An MCP server that connects AI assistants to the [Nodus](https://github.com/Masterplanner25/Nodus) language runtime — giving them persistent memory, sandboxed code execution, and checkpoint/resume orchestration workflows, all powered by `.nd` scripts running on the Nodus VM.
 
-Supports **Claude Desktop** (stdio) and **ChatGPT Desktop** (streamable HTTP at `/mcp`, through a tunnel).
+Supports **Claude Desktop** (stdio), and **claude.ai** and **ChatGPT** (streamable HTTP at `/mcp`, through a tunnel, with sign-in).
 
 ## Tools
 
@@ -176,53 +176,78 @@ This package is part of the **Nodus ecosystem** — a family of companion librar
 server.py          — MCP tool definitions, NodusRuntime setup, request dispatch
 runner.py          — goal/workflow execution via ModuleLoader + VM
 memory_store.py    — SQLite-backed thread-safe memory store
+oauth.py           — sign-in for --http --public-url (OAuth provider, consent page, grants)
 goals/             — .nd goal definitions (bundled + custom)
 workflows/         — .nd workflow definitions (bundled + custom)
 ~/.nodus-mcp-server/data/memory.db  — SQLite DB (persists across upgrades)
+~/.nodus-mcp-server/data/oauth.db   — OAuth clients and grants (with --public-url)
+~/.nodus-mcp-server/passphrase.json — the sign-in passphrase, scrypt-hashed
 ```
 
-## ChatGPT Desktop setup
+## claude.ai and ChatGPT setup (remote, with sign-in)
 
-> **This server has no authentication.** Anyone who can reach its URL can use every tool: read, change and delete your memory, and run code in the `nodus_exec` sandbox. Do not publish the URL, and stop the tunnel when you are not using it. By default `--http` listens only on `127.0.0.1`.
+claude.ai and ChatGPT call the server from their own cloud, not from your machine, so they need a public HTTPS URL. They cannot use `localhost` or `127.0.0.1`. Use a tunnel such as ngrok, and turn on **sign-in** so that the URL alone gets nobody in.
 
-ChatGPT calls the server from OpenAI's cloud, not from your machine, so it needs a public HTTPS URL. It cannot use `localhost` or `127.0.0.1`. Use ngrok to expose the server.
+With `--public-url`, the server is its own OAuth authorization server. Each app registers itself, sends you to a consent page on your server, and gets a token only after you enter your passphrase and choose what it may do. Without `--public-url`, `--http` has no sign-in at all, exactly as before 0.2.0, and must stay on loopback.
 
-### 1. Start the HTTP server
+### 1. Set a passphrase
 
 ```bash
-nodus-mcp-server --http --port 8765
+nodus-mcp-server set-passphrase
 ```
 
-This prints:
-```
-[nodus-mcp-server] HTTP listening on http://127.0.0.1:8765/mcp
-[nodus-mcp-server] Point ChatGPT / your MCP client at: http://127.0.0.1:8765/mcp
+It is prompted for, never passed as an argument, and stored as a scrypt hash in `~/.nodus-mcp-server/passphrase.json`. Setting a new one signs every app out.
+
+### 2. Start the server with your public URL
+
+```bash
+nodus-mcp-server --http --port 8765 --public-url https://<your-static-domain>.ngrok.io
 ```
 
-That is the **local** address. A local MCP client can use it directly, but ChatGPT needs the tunnel URL from step 2.
+`--public-url` is the `https://` origin the tunnel serves, with no path. You can set `NODUS_MCP_PUBLIC_URL` instead. The server refuses to start with it if no passphrase is set.
 
-### 2. Expose via ngrok
+### 3. Start the tunnel
 
 ```bash
 ngrok http --url=<your-static-domain>.ngrok.io 8765
 ```
 
-Keep both terminals open while using ChatGPT, and close them when you finish.
+### 4. Connect
 
-### 3. Connect in ChatGPT Desktop
+The server URL in both apps is `https://<your-static-domain>.ngrok.io/mcp`.
 
-1. Click your profile icon → **Settings** → **Apps**
-2. Go to **Advanced Settings** → enable **Developer Mode**
-3. Click **Create App** (or **Connect more**)
-4. Enter a name (e.g. `Nodus`), description, and base URL: `https://<your-static-domain>.ngrok.io/mcp`
+- **claude.ai:** Settings → Connectors → **Add custom connector**, enter the URL, and choose dynamic client registration (DCR). This server does not support a client metadata URL (CIMD).
+- **ChatGPT:** Settings → Apps → Advanced settings → enable **Developer Mode**, then **Create app** with the URL and OAuth authentication.
 
-> **Created the app before 0.1.11?** Its URL probably ends in `/sse`. 0.1.11 replaced the SSE transport with streamable HTTP at `/mcp`, and `/sse` now returns 404, so ChatGPT can no longer reach the server. ChatGPT's app settings have no field for changing the URL: delete the app and create it again with the `/mcp` URL.
+Your browser opens the consent page. It shows the address the app will send you back to. Check that address, since apps choose their own names. Tick what to allow, enter your passphrase, and press **Allow**.
 
-### 4. Use in a chat
+> **Created a ChatGPT app before 0.1.11?** Its URL probably ends in `/sse`. 0.1.11 replaced the SSE transport with streamable HTTP at `/mcp`, and `/sse` now returns 404. ChatGPT's app settings have no field for changing the URL: delete the app and create it again with the `/mcp` URL.
 
-Open a new chat → click `+` → **More** → **Developer Mode** → enable your Nodus app. The seven `nodus_*` tools are now available.
+### What an app can be allowed to do
+
+| Scope | Tools | Ticked by default |
+|---|---|---|
+| `memory.read` | `nodus_recall` | yes |
+| `memory.write` | `nodus_remember`, `nodus_forget` | no |
+| `workflow.run` | `nodus_run_goal`, `nodus_run_workflow`, `nodus_resume_workflow` | no |
+| `exec` | `nodus_exec` | no, and only offered with `--allow-remote-exec` |
+
+An app sees only the tools its token allows. `nodus_exec` runs code on your computer. It is sandboxed, but a sandbox bug there is a bug on your machine, so it is not offered over the public URL unless you start the server with `--allow-remote-exec`.
+
+### Managing apps
+
+```bash
+nodus-mcp-server grants list            # who is connected, with what, and when it was last used
+nodus-mcp-server grants revoke <id>     # sign one out now
+```
+
+Access tokens last an hour. Refresh tokens last 30 days and change on every use. If an old refresh token is used again, that app is signed out.
 
 > **Note:** Memory is shared with the Claude Desktop instance (same SQLite database at `~/.nodus-mcp-server/data/memory.db`).
+
+### Local HTTP clients
+
+`nodus-mcp-server --http` with no `--public-url` serves `http://127.0.0.1:8765/mcp` with **no authentication**. Anything that can reach it can use every tool. Use it only for local clients, and never put a tunnel in front of it. With `--public-url` on, local HTTP clients sign in too, because the server cannot tell a tunnelled request from a local one. Claude Desktop uses stdio and is unaffected either way.
 
 ---
 
