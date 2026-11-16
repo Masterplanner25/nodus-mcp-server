@@ -13,7 +13,7 @@ from mcp.server.streamable_http_manager import StreamableHTTPSessionManager
 from mcp import types
 
 from nodus.runtime.embedding import NodusRuntime
-from . import __version__, runner
+from . import __version__, oauth, runner
 from .memory_store import MemoryStore
 
 _DATA_DIR = os.path.join(os.path.expanduser("~"), ".nodus-mcp-server", "data")
@@ -161,8 +161,18 @@ _TOOLS = [
 ]
 
 
-def _dispatch(name: str, arguments: dict | None) -> list[types.TextContent]:
-    """One tool call -> text content. Transport- and SDK-agnostic."""
+def _dispatch(name: str, arguments: dict | None, scopes: frozenset | None = None) -> list[types.TextContent]:
+    """One tool call -> text content. Transport- and SDK-agnostic.
+
+    `scopes` is None without OAuth (stdio, or `--http` with no public URL), and
+    the calling token's scopes with it: then a tool its scopes do not cover is
+    refused as a result naming the missing scope, never run.
+    """
+    if scopes is not None and not oauth.tool_allowed(name, scopes):
+        needed = oauth.TOOL_SCOPES.get(name)
+        error = (f"{name} needs the {needed!r} scope, which this app was not granted"
+                 if needed else f"Unknown tool: {name}")
+        return [types.TextContent(type="text", text=json.dumps({"error": error}))]
     handlers = {
         "nodus_remember": _remember,
         "nodus_recall": _recall,
@@ -189,26 +199,46 @@ def _dispatch(name: str, arguments: dict | None) -> list[types.TextContent]:
 #: two servers do not drift.
 _SDK_V2 = hasattr(Server, "add_request_handler")
 
+def _request_scopes(request) -> frozenset | None:
+    """The OAuth scopes `oauth.BearerGate` put on this HTTP request, or None without OAuth."""
+    scope = getattr(request, "scope", None)
+    return scope.get(oauth.SCOPE_KEY) if isinstance(scope, dict) else None
+
+
+def _visible_tools(scopes: frozenset | None) -> list[types.Tool]:
+    """A client never sees a tool it may not call, so it never plans around one."""
+    if scopes is None:
+        return _TOOLS
+    return [t for t in _TOOLS if oauth.tool_allowed(t.name, scopes)]
+
+
 if _SDK_V2:
 
     async def _list_tools_v2(ctx, params) -> types.ListToolsResult:
-        return types.ListToolsResult(tools=_TOOLS)
+        return types.ListToolsResult(tools=_visible_tools(_request_scopes(ctx.request)))
 
     async def _call_tool_v2(ctx, params) -> types.CallToolResult:
-        return types.CallToolResult(content=_dispatch(params.name, params.arguments))
+        scopes = _request_scopes(ctx.request)
+        return types.CallToolResult(content=_dispatch(params.name, params.arguments, scopes))
 
     app.add_request_handler("tools/list", types.PaginatedRequestParams, _list_tools_v2)
     app.add_request_handler("tools/call", types.CallToolRequestParams, _call_tool_v2)
 
 else:
 
+    def _current_scopes() -> frozenset | None:
+        try:
+            return _request_scopes(app.request_context.request)
+        except LookupError:  # no request in flight
+            return None
+
     @app.list_tools()
     async def list_tools() -> list[types.Tool]:
-        return _TOOLS
+        return _visible_tools(_current_scopes())
 
     @app.call_tool()
     async def call_tool(name: str, arguments: dict) -> list[types.TextContent]:
-        return _dispatch(name, arguments)
+        return _dispatch(name, arguments, _current_scopes())
 
 
 # ── Tool handlers ─────────────────────────────────────────────────────────────
@@ -275,7 +305,7 @@ async def _serve_stdio() -> None:
         await app.run(read_stream, write_stream, app.create_initialization_options())
 
 
-def build_http_app():
+def build_http_app(oauth_cfg: "oauth.OAuthConfig | None" = None):
     """The ASGI app `--http` serves: the MCP session manager mounted at /mcp.
 
     `StreamableHTTPSessionManager` must be *running* -- its task group is
@@ -285,13 +315,25 @@ def build_http_app():
     never entered `run()`, so every request still failed, differently. The
     manager's lifetime is the app's lifespan now, which is the one place uvicorn
     (and Starlette's `TestClient`) will start and stop it.
+
+    With `oauth_cfg` (a public URL), the server is also its own OAuth
+    authorization server and `/mcp` needs an access token (`oauth.py`). Without
+    it the app is exactly what 0.1.16 served.
     """
     from contextlib import asynccontextmanager
 
     from starlette.applications import Starlette
     from starlette.routing import Mount
 
-    session_manager = StreamableHTTPSessionManager(app)
+    routes: list = []
+    middleware: list = []
+    security = None
+    if oauth_cfg is not None:
+        provider = oauth.NodusOAuthProvider(oauth_cfg)
+        routes, middleware = oauth.routes_and_middleware(provider)
+        security = oauth.transport_security(oauth_cfg)
+
+    session_manager = StreamableHTTPSessionManager(app, security_settings=security)
 
     @asynccontextmanager
     async def lifespan(_app):
@@ -300,21 +342,29 @@ def build_http_app():
 
     return Starlette(
         routes=[
+            *routes,
             Mount("/mcp", app=session_manager.handle_request),
         ],
+        middleware=middleware,
         lifespan=lifespan,
     )
 
 
-async def _serve_http(host: str, port: int, ssl_cert: str | None, ssl_key: str | None) -> None:
+async def _serve_http(host: str, port: int, ssl_cert: str | None, ssl_key: str | None,
+                      oauth_cfg: "oauth.OAuthConfig | None" = None) -> None:
     import uvicorn
 
-    starlette_app = build_http_app()
+    starlette_app = build_http_app(oauth_cfg)
 
     scheme = "https" if ssl_cert else "http"
     url = f"{scheme}://{host}:{port}/mcp"
     print(f"[nodus-mcp-server] HTTP listening on {url}", file=sys.stderr)
-    print(f"[nodus-mcp-server] Point ChatGPT / your MCP client at: {url}", file=sys.stderr)
+    if oauth_cfg is not None:
+        print(f"[nodus-mcp-server] sign-in on; clients connect to {oauth_cfg.resource} "
+              f"(scopes offered: {', '.join(oauth_cfg.offered_scopes)})", file=sys.stderr)
+    else:
+        print("[nodus-mcp-server] no sign-in: anything that reaches this URL can call every tool. "
+              "ChatGPT and claude.ai need a public https URL; see --public-url.", file=sys.stderr)
 
     config = uvicorn.Config(
         starlette_app,
@@ -329,6 +379,9 @@ async def _serve_http(host: str, port: int, ssl_cert: str | None, ssl_key: str |
 
 
 def main() -> None:
+    if len(sys.argv) > 1 and sys.argv[1] in {"set-passphrase", "grants"}:
+        sys.exit(oauth.cli(sys.argv[1:]))
+
     parser = argparse.ArgumentParser(
         prog="nodus-mcp-server",
         description="Nodus MCP Server — memory, goals, workflows, and sandboxed execution over MCP",
@@ -337,7 +390,7 @@ def main() -> None:
     group.add_argument("--stdio", action="store_true",
                        help="Serve on stdin/stdout (Claude Desktop spawned-child mode)")
     group.add_argument("--http", action="store_true",
-                       help="Serve over HTTP/SSE (ChatGPT Desktop and other HTTP MCP clients)")
+                       help="Serve streamable HTTP at /mcp (ChatGPT, claude.ai and other HTTP MCP clients)")
     parser.add_argument("--port", type=int, default=8765,
                         help="HTTP port (default: 8765)")
     parser.add_argument("--host", default="127.0.0.1",
@@ -346,6 +399,12 @@ def main() -> None:
                         help="Path to SSL certificate file (enables HTTPS)")
     parser.add_argument("--ssl-key", default="",
                         help="Path to SSL private key file")
+    parser.add_argument("--public-url", default=os.environ.get("NODUS_MCP_PUBLIC_URL", ""),
+                        help="The https origin clients reach this server at (e.g. a tunnel). "
+                             "Turns on sign-in: /mcp then needs an OAuth token. "
+                             "Also NODUS_MCP_PUBLIC_URL. Run `nodus-mcp-server set-passphrase` first.")
+    parser.add_argument("--allow-remote-exec", action="store_true",
+                        help="With --public-url, also offer the `exec` scope (nodus_exec). Off by default.")
     args = parser.parse_args()
 
     if args.stdio:
@@ -354,7 +413,19 @@ def main() -> None:
     else:
         ssl_cert = args.ssl_cert or None
         ssl_key = args.ssl_key or None
-        asyncio.run(_serve_http(args.host, args.port, ssl_cert, ssl_key))
+        oauth_cfg = None
+        if args.public_url:
+            try:
+                issuer = oauth.normalize_public_url(args.public_url)
+            except ValueError as exc:
+                parser.error(str(exc))
+            home = oauth.default_home()
+            if not oauth.passphrase_is_set(home):
+                parser.error("sign-in needs a passphrase. Run `nodus-mcp-server set-passphrase` first.")
+            oauth_cfg = oauth.OAuthConfig(issuer=issuer, home=home, allow_remote_exec=args.allow_remote_exec)
+        elif args.allow_remote_exec:
+            parser.error("--allow-remote-exec only means something with --public-url")
+        asyncio.run(_serve_http(args.host, args.port, ssl_cert, ssl_key, oauth_cfg))
 
 
 if __name__ == "__main__":

@@ -113,6 +113,18 @@ language version.
   to hold. Do **not** add an upper cap on nodus-lang (ecosystem policy — the suite
   catches a real break; a cap earns its place once a break is known).
 
+- **OAuth (`oauth.py`, 0.2.0) is opt-in and must stay that way.** Without
+  `--public-url`, `build_http_app()` must serve exactly what 0.1.16 did:
+  `test_without_a_public_url_http_is_unchanged` pins it. The tool scope check
+  reads `oauth.SCOPE_KEY` from the HTTP request's ASGI scope. That key is set
+  only by `BearerGate` after a token is verified. It is reached through
+  `app.request_context.request` on mcp 1.x and `ctx.request` on 2.x. `None`
+  means "no OAuth" (stdio, loopback HTTP), never "token missing", because the
+  gate 401s first. A new tool needs an entry in `oauth.TOOL_SCOPES`, or it can
+  never be called over OAuth. mcp 1.x's `/revoke` requires a `client_secret`
+  field even from a public client (an empty string works). That is an SDK quirk,
+  not ours.
+
 ## PR workflow
 
 `main` is branch-protected: no direct pushes, changes go through a branch + PR + CI.
