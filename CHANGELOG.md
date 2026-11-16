@@ -6,6 +6,18 @@ Versioning: [Semantic Versioning](https://semver.org)
 This file starts at 0.1.12. Releases 0.1.0–0.1.11 predate it; their history is in
 the git log and the GitHub releases.
 
+## [Unreleased]
+
+### Fixed
+
+- **Allow on the consent page did nothing in Chrome.** The page's
+  `Content-Security-Policy` had `form-action 'self'`, and Chrome applies
+  `form-action` to the redirect that follows a form submit, so the 302 to the
+  app's callback (e.g. `https://claude.ai/api/mcp/auth_callback`) was blocked
+  silently. The grant was made, the app never got its code, and a second click
+  found the request used up. The consent page now allows `'self'` plus the
+  origin of the redirect it is approving, and nothing else.
+
 ## [0.2.0] — 2026-11-15
 
 ### Added

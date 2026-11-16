@@ -611,14 +611,26 @@ class NodusOAuthProvider:
 
 # ── the sign-in and consent page ──────────────────────────────────────────────
 
+_CSP = "default-src 'none'; style-src 'unsafe-inline'; form-action {form_action}; frame-ancestors 'none'; base-uri 'none'"
 _PAGE_HEADERS = {
     "Cache-Control": "no-store",
     "X-Frame-Options": "DENY",
     "Referrer-Policy": "no-referrer",
-    "Content-Security-Policy": (
-        "default-src 'none'; style-src 'unsafe-inline'; form-action 'self'; frame-ancestors 'none'; base-uri 'none'"
-    ),
+    "Content-Security-Policy": _CSP.format(form_action="'self'"),
 }
+
+
+def _consent_page_headers(redirect_uri: str) -> dict:
+    """The consent page's headers: its form may post here and **redirect to the app it approves**.
+
+    Chrome applies `form-action` to the redirects that follow a form submit, so `form-action 'self'` alone
+    silently blocked the 302 to the client's callback: Allow did nothing and a second click found the request
+    used up (claude.ai, 2026-11-16). The pending request's redirect origin is added, and nothing else.
+    """
+    parsed = urlparse(redirect_uri)
+    origin = f"{parsed.scheme}://{parsed.netloc}" if parsed.scheme and parsed.netloc else ""
+    form_action = f"'self' {origin}" if origin and all(c not in origin for c in " ;,'\"") else "'self'"
+    return {**_PAGE_HEADERS, "Content-Security-Policy": _CSP.format(form_action=form_action)}
 _CSRF_COOKIE = "nodus_oauth_csrf"
 
 
@@ -652,7 +664,7 @@ label{{display:block;margin:.6rem 0}} input[type=password]{{width:100%;padding:.
 <button type="submit" name="action" value="approve">Allow</button>
 <button type="submit" name="action" value="deny" formnovalidate>Deny</button>
 </form></body></html>"""
-    response = HTMLResponse(body, status_code=status, headers=_PAGE_HEADERS)
+    response = HTMLResponse(body, status_code=status, headers=_consent_page_headers(pending["redirect_uri"]))
     response.set_cookie(_CSRF_COOKIE, pending["csrf"], httponly=True, samesite="strict",
                         secure=cfg.issuer.startswith("https://"), path=CONSENT_PATH, max_age=PENDING_TTL_S)
     return response
