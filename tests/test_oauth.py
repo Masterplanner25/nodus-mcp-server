@@ -313,6 +313,24 @@ def test_consent_post_without_the_csrf_cookie_is_refused(home):
         assert resp.status_code == 400 and "location" not in resp.headers
 
 
+def test_consent_page_lets_its_form_redirect_to_the_approved_app_only(home):
+    # Chrome applies form-action to the redirect after a submit: 'self' alone blocked the 302 to claude.ai.
+    with make_client(home) as client:
+        client_id = register(client)
+        _, challenge = pkce()
+        _, _, page = open_consent(client, start_authorize(client, client_id, challenge))
+        csp = page.headers["content-security-policy"]
+        origin = "{0.scheme}://{0.netloc}".format(urlparse(REDIRECT))
+        assert f"form-action 'self' {origin};" in csp, csp
+        assert "frame-ancestors 'none'" in csp and "default-src 'none'" in csp
+
+
+def test_a_redirect_origin_cannot_widen_the_policy():
+    headers = oauth._consent_page_headers("https://evil.example; script-src *")
+    assert "script-src" not in headers["Content-Security-Policy"]
+    assert "form-action 'self';" in headers["Content-Security-Policy"]
+
+
 def test_consent_page_shows_the_redirect_host_and_never_pre_ticks_a_write(home):
     with make_client(home) as client:
         client_id = register(client)
